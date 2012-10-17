@@ -97,7 +97,7 @@ string prettyReport()
                 finalReport["result"] = "F";
                 pretty_tests ~= "      assertions:\n";
                 foreach(Json assertion; result["assertions"]) {
-                pretty_tests ~= "        - assert:\n";
+                    pretty_tests ~= "        - assert:\n";
                     if (assertion["message"].toString() != "undefined") {
                         pretty_tests ~= "           message: " ~ assertion["message"].toString() ~ "\n";
                     }
