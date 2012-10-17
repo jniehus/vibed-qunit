@@ -1,0 +1,7 @@
+﻿{
+    "name": "QUnit Command Line Example",
+	"description": "Simple HTTP server that serves QUnit",
+    "authors": [ "Joshua Niehus" ],
+    "version": "0.0.1",
+    "dependencies": {}
+}
