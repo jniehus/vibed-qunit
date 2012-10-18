@@ -64,6 +64,7 @@ void handleRequest(HttpServerRequest req, HttpServerResponse res)
 void stopVibe(HttpServerRequest req = null, HttpServerResponse res = null)
 {
     exitEventLoop();
+    send(mainTid, 0);
 }
 
 string doWork(Json data)
@@ -181,7 +182,7 @@ static this()
 {
     auto settings = new HttpServerSettings;
     settings.port = 23432;
-    settings.onStart = () => send(mainTid, true);
+    settings.onStart = () => send(mainTid, 1.0f);
 
     auto router = new UrlRouter;
     router.get("/", &handleRequest);
@@ -195,16 +196,13 @@ static this()
 void launchVibe(Tid tid)
 {
     mainTid = tid;
-    int status;
-    scope(exit) { send(tid, status); }
-
     logInfo("Running event loop...");
     try {
         startListening(); // soon to be replaced or automatic
-        status = runEventLoop();
+        runEventLoop();
     } catch( Throwable th ){
         logError("Unhandled exception in event loop: %s", th.toString());
-        status = 2;
+        send(tid, 2);
     }
 }
 
@@ -245,7 +243,7 @@ struct Args
 // returns 2 if something went haywire
 int main(string[] argz)
 {
-    //writeln(argz); // sub quote custom args. Example: $>vibe -- -m '"Module 2"'
+    //writeln(argz); // sub quote custom args. Example: ~/vibed-qunit$>vibe -- -m '"Module 2"'
     Args args = Args();
     getopt(argz,
         "testnumber|t", &args.testNumber,
@@ -256,13 +254,13 @@ int main(string[] argz)
         // windows: "ie": Browser("iexplore.exe", "C:\\Program Files\\Internet Explorer\\iexplore.exe")
         "safari":  Browser("Safari"),
         "chrome":  Browser("Google Chrome"),
-        "firefox": Browser("Firefox"),
-        "opera":   Browser("Opera")
+        //"firefox": Browser("Firefox"),
+        //"opera":   Browser("Opera")
     ];
 
     // start server and run available browsers
     auto vibeTid = spawn( &launchVibe, thisTid );
-    if (receiveTimeout(dur!"seconds"(10), (bool vibeReady) {})) {
+    if (receiveTimeout(dur!"seconds"(10), (float vibeReady) {})) {
         foreach(string browser, Browser obj; availableBrowsers) {
             availableBrowsers[browser].open(url);
             if (!receiveTimeout(dur!"seconds"(5), (string qunitDone) {})) {
@@ -275,7 +273,7 @@ int main(string[] argz)
 
     // stop server after a period of time if it doesnt close by itself
     int vibeStatus = 2; // 2 = some error occured
-    auto received = receiveTimeout( dur!"seconds"(10), (int _vibeStatus) {
+    auto received = receiveTimeout(dur!"seconds"(10), (int _vibeStatus) {
         vibeStatus = _vibeStatus;
     });
     if (!received) { externalStopVibe(); }
