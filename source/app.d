@@ -64,7 +64,6 @@ void handleRequest(HttpServerRequest req, HttpServerResponse res)
 void stopVibe(HttpServerRequest req = null, HttpServerResponse res = null)
 {
     exitEventLoop();
-    send(mainTid, 0);
 }
 
 string doWork(Json data)
@@ -196,7 +195,7 @@ void launchVibe(Tid tid)
     logInfo("Running event loop...");
     try {
         startListening(); // soon to be replaced or automatic
-        runEventLoop();
+        send(tid, runEventLoop());
     } catch( Throwable th ){
         logError("Unhandled exception in event loop: %s", th.toString());
         send(tid, 2);
