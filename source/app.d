@@ -9,10 +9,10 @@ import core.thread, std.concurrency;
 import std.getopt, std.stdio, std.array;
 import std.process, std.conv, std.uri;
 
-Json[] qunitResults;
-string browser;
-string[string] finalReport;
-Tid mainTid;
+Json[]          qunitResults;
+string          browser;
+shared string[] browserReports;
+Tid             mainTid;
 
 struct Browser
 {
@@ -95,7 +95,6 @@ string prettyReport()
             pretty_tests ~= "      module: " ~ result["module"].toString() ~ "\n";
             pretty_tests ~= "      result: " ~ pass_fail ~ "\n";
             if (result["failed"].toString() != "0") {
-                finalReport["result"] = "F";
                 pretty_tests ~= "      assertions:\n";
                 foreach(Json assertion; result["assertions"]) {
                     pretty_tests ~= "        - assert:\n";
@@ -137,9 +136,7 @@ string prettyReport()
 
 string generateReport()
 {
-    finalReport["result"] = "P";
-    finalReport["details"] = prettyReport();
-    writeln(finalReport["details"]);
+    browserReports ~= prettyReport();
     qunitResults = null;
     send(mainTid, "qunit complete");
     return "done";
@@ -278,6 +275,9 @@ int main(string[] argz)
     });
     if (!received) { externalStopVibe(); }
 
+    foreach(report; browserReports) {
+        writeln(report);
+    }
     writeln(vibeStatus);
     return vibeStatus;
 }
