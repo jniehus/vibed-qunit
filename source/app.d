@@ -2,7 +2,7 @@
  * Vibe Server
 **/
 
-module qunit;
+module app;
 
 import vibe.vibe;
 import core.thread, std.concurrency;
