@@ -14,6 +14,21 @@ string          browser;
 shared string[] browserReports;
 Tid             mainTid;
 
+struct SignalVibeReady
+{
+    bool isReady = false;
+}
+
+struct SignalQUnitDone
+{
+    bool isDone = false;
+}
+
+struct SignalVibeStatus
+{
+    int status;
+}
+
 struct Browser
 {
     string name;
@@ -137,7 +152,7 @@ string generateReport()
 {
     browserReports ~= prettyReport();
     qunitResults = null;
-    send(mainTid, "qunit complete");
+    send(mainTid, SignalQUnitDone(true));
     return "done";
 }
 
@@ -178,7 +193,7 @@ static this()
 {
     auto settings = new HttpServerSettings;
     settings.port = 23432;
-    settings.onStart = () => send(mainTid, 1.0f);
+    settings.onStart = () => send(mainTid, SignalVibeReady(true));
 
     auto router = new UrlRouter;
     router.get("/", &handleRequest);
@@ -195,12 +210,14 @@ void launchVibe(Tid tid)
     logInfo("Running event loop...");
     try {
         startListening(); // soon to be replaced or automatic
-        send(tid, runEventLoop());
+        send(tid, SignalVibeStatus(runEventLoop()));
     } catch( Throwable th ){
         logError("Unhandled exception in event loop: %s", th.toString());
         send(tid, 2);
     }
 }
+
+//---
 
 void externalStopVibe()
 {
@@ -256,10 +273,10 @@ int main(string[] argz)
 
     // start server and run available browsers
     auto vibeTid = spawn( &launchVibe, thisTid );
-    if (receiveTimeout(dur!"seconds"(10), (float vibeReady) {})) {
+    if (receiveTimeout(dur!"seconds"(10), (SignalVibeReady vibeReady) {})) {
         foreach(string browser, Browser obj; availableBrowsers) {
             availableBrowsers[browser].open(url);
-            if (!receiveTimeout(dur!"seconds"(5), (string qunitDone) {})) {
+            if (!receiveTimeout(dur!"seconds"(5), (SignalQUnitDone qunitDone) {})) {
                 writeln(browser ~ " timed out!");
             }
             availableBrowsers[browser].close();
@@ -269,8 +286,8 @@ int main(string[] argz)
 
     // stop server after a period of time if it doesnt close by itself
     int vibeStatus = 2; // 2 = some error occured
-    auto received = receiveTimeout(dur!"seconds"(10), (int _vibeStatus) {
-        vibeStatus = _vibeStatus;
+    auto received  = receiveTimeout(dur!"seconds"(10), (SignalVibeStatus _vibeStatus) {
+        vibeStatus = _vibeStatus.status;
     });
     if (!received) { externalStopVibe(); }
 
