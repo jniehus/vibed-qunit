@@ -10,7 +10,6 @@ import std.getopt, std.stdio, std.array;
 import std.process, std.conv, std.uri;
 
 Json[]          qunitResults;
-string          browser;
 shared string[] browserReports;
 Tid             mainTid;
 
@@ -89,6 +88,13 @@ string doWork(Json data)
 
 string recordResults(Json data)
 {
+    /*
+      this is a good place to store results to mongoDB:
+      db->app->tests->qunit->browser->testRun->result
+
+      then a report generator will pull data from the
+      last testRun for each browser
+    */
     qunitResults ~= data;
     return "done";
 }
@@ -99,7 +105,7 @@ string prettyReport()
     Json summary = null;
     string pretty_summary = null;
     string pretty_header = "\n--- !QUnit_Command_Line_Example_Tests\n";
-    string pretty_browser = "browser: " ~ browser ~ "\n";
+    string pretty_browser = "browser: " ~ qunitResults[0]["browser"].toString() ~ "\n";
     string pretty_tests = "tests:\n";
     foreach(Json result; qunitResults) {
         if (result["action"].toString() == q{"testresults"}) {
@@ -148,7 +154,7 @@ string prettyReport()
     return pretty;
 }
 
-string generateReport()
+string qUnitDone()
 {
     browserReports ~= prettyReport();
     qunitResults = null;
@@ -162,11 +168,7 @@ void processReq(HttpServerRequest req, HttpServerResponse res)
     string resBody;
     switch(req.json["action"].toString())
     {
-    case `"browserinfo"`:
-        browser = req.json["info"].toString();
-        resBody = "done";
-        break;
-    case `"doWork"`:
+    case `"dowork"`:
         resBody = doWork(req.json);
         break;
     case `"testresults"`:
@@ -175,8 +177,8 @@ void processReq(HttpServerRequest req, HttpServerResponse res)
     case `"suiteresults"`:
         resBody = recordResults(req.json);
         break;
-    case `"generatereport"`:
-        resBody = generateReport();
+    case `"qunitdone"`:
+        resBody = qUnitDone();
         break;
     case `"stopvibe"`:
         stopVibe();
@@ -268,15 +270,15 @@ int main(string[] argz)
         "safari":  Browser("Safari"),
         "chrome":  Browser("Google Chrome"),
         //"firefox": Browser("Firefox"),
-        //"opera":   Browser("Opera")
+        "opera":   Browser("Opera")
     ];
 
     // start server and run available browsers
     auto vibeTid = spawn( &launchVibe, thisTid );
-    if (receiveTimeout(dur!"seconds"(10), (SignalVibeReady vibeReady) {})) {
+    if (receiveTimeout(dur!"seconds"(10), (SignalVibeReady _vibeReady) {})) {
         foreach(string browser, Browser obj; availableBrowsers) {
             availableBrowsers[browser].open(url);
-            if (!receiveTimeout(dur!"seconds"(5), (SignalQUnitDone qunitDone) {})) {
+            if (!receiveTimeout(dur!"seconds"(5), (SignalQUnitDone _qunitDone) {})) {
                 writeln(browser ~ " timed out!");
             }
             availableBrowsers[browser].close();

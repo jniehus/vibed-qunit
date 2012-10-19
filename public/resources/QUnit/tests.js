@@ -8,6 +8,9 @@ $(window).load(function () {
 
     // generic method to post requests to vibe
     function postRequest (req) {
+        // this will tag each request with a specific
+        // browser. This should help with parallelization
+        req["browser"] = $.browser;
         return $.ajax({
             type: 'POST',
             url: vibe + '/process_req',
@@ -18,7 +21,7 @@ $(window).load(function () {
     }
 
     function doWorkVibe(data) {
-        data['action'] = 'doWork';
+        data['action'] = 'dowork';
         return postRequest(data);
     }
 
@@ -52,14 +55,11 @@ $(window).load(function () {
     function suiteResults(details) {
         details['action'] = "suiteresults"
         postRequest(details).done(function(data) {
-            postRequest({action:'generatereport'});
+            postRequest({action:'qunitdone'});
         });
     }
 
     /** SETUP **/
-
-    // tell vibe what browser this is
-    QUnit.begin(postRequest({action:"browserinfo", info:$.browser}));
 
     // call this function after each test is done
     QUnit.testDone(testResults);
