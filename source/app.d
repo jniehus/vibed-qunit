@@ -5,11 +5,12 @@
 module app;
 
 import vibe.vibe;
-import core.thread, std.concurrency;
+import core.thread;
+import std.concurrency;
 import std.getopt, std.stdio, std.array;
-import std.process, std.conv, std.uri;
+import std.process, std.uri;
 
-Json[]          qunitResults;
+Json[][string]  qunitResults;
 shared string[] browserReports;
 Tid             mainTid;
 
@@ -86,6 +87,24 @@ string doWork(Json data)
     return "done";
 }
 
+string getBrowserName(Json browserData)
+{
+    string name = "unknown";
+    if (browserData["chrome"].toString() == "true") {
+        name = "chrome";
+    }
+    else if (browserData["mozilla"].toString() == "true") {
+        name = "firefox";
+    }
+    else if (browserData["opera"].toString()   == "true") {
+        name = "opera";
+    }
+    else if (browserData["safari"].toString()  == "true") {
+        name = "safari";
+    }
+    return name;
+}
+
 string recordResults(Json data)
 {
     /*
@@ -95,19 +114,21 @@ string recordResults(Json data)
       then a report generator will pull data from the
       last testRun for each browser
     */
-    qunitResults ~= data;
+
+    auto browserName = getBrowserName(data["browser"]);
+    qunitResults[browserName] ~= data;
     return "done";
 }
 
-string prettyReport()
+string prettyReport(string browserName)
 {
     string pass_fail;
     Json summary = null;
     string pretty_summary = null;
     string pretty_header = "\n--- !QUnit_Command_Line_Example_Tests\n";
-    string pretty_browser = "browser: " ~ qunitResults[0]["browser"].toString() ~ "\n";
+    string pretty_browser = "browser: " ~ qunitResults[browserName][0]["browser"].toString() ~ "\n";
     string pretty_tests = "tests:\n";
-    foreach(Json result; qunitResults) {
+    foreach(Json result; qunitResults[browserName]) {
         if (result["action"].toString() == q{"testresults"}) {
             pretty_tests ~= "  - test:\n";
             pretty_tests ~= "      name: " ~ result["name"].toString() ~ "\n";
@@ -154,10 +175,10 @@ string prettyReport()
     return pretty;
 }
 
-string qUnitDone()
+string qUnitDone(Json data)
 {
-    browserReports ~= prettyReport();
-    qunitResults = null;
+    auto browserName = getBrowserName(data["browser"]);
+    browserReports  ~= prettyReport(browserName);
     send(mainTid, SignalQUnitDone(true));
     return "done";
 }
@@ -178,7 +199,7 @@ void processReq(HttpServerRequest req, HttpServerResponse res)
         resBody = recordResults(req.json);
         break;
     case `"qunitdone"`:
-        resBody = qUnitDone();
+        resBody = qUnitDone(req.json);
         break;
     case `"stopvibe"`:
         stopVibe();
@@ -193,6 +214,8 @@ void processReq(HttpServerRequest req, HttpServerResponse res)
 
 static this()
 {
+    qunitResults = null;
+
     auto settings = new HttpServerSettings;
     settings.port = 23432;
     settings.onStart = () => send(mainTid, SignalVibeReady(true));
@@ -265,23 +288,23 @@ int main(string[] argz)
         "module|m",     &args.moduleName);
 
     auto url = buildURL(args);
-    Browser[string] availableBrowsers = [
+    Browser[] availableBrowsers = [
         // windows: "ie": Browser("iexplore.exe", "C:\\Program Files\\Internet Explorer\\iexplore.exe")
-        "safari":  Browser("Safari"),
-        "chrome":  Browser("Google Chrome"),
+        Browser("Safari"),
+        Browser("Google Chrome"),
         //"firefox": Browser("Firefox"),
-        "opera":   Browser("Opera")
+        Browser("Opera")
     ];
 
     // start server and run available browsers
     auto vibeTid = spawn( &launchVibe, thisTid );
     if (receiveTimeout(dur!"seconds"(10), (SignalVibeReady _vibeReady) {})) {
-        foreach(string browser, Browser obj; availableBrowsers) {
-            availableBrowsers[browser].open(url);
+        foreach(Browser browser; availableBrowsers) {
+            browser.open(url);
             if (!receiveTimeout(dur!"seconds"(5), (SignalQUnitDone _qunitDone) {})) {
-                writeln(browser ~ " timed out!");
+                writeln(browser.name ~ " timed out!");
             }
-            availableBrowsers[browser].close();
+            browser.close();
         }
         externalStopVibe();
     }
