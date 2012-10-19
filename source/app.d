@@ -115,8 +115,7 @@ string recordResults(Json data)
       last testRun for each browser
     */
 
-    auto browserName = getBrowserName(data["browser"]);
-    qunitResults[browserName] ~= data;
+    qunitResults[getBrowserName(data["browser"])] ~= data;
     return "done";
 }
 
@@ -177,8 +176,7 @@ string prettyReport(string browserName)
 
 string qUnitDone(Json data)
 {
-    auto browserName = getBrowserName(data["browser"]);
-    browserReports  ~= prettyReport(browserName);
+    browserReports  ~= prettyReport(getBrowserName(data["browser"]));
     send(mainTid, SignalQUnitDone(true));
     return "done";
 }
