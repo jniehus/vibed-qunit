@@ -59,7 +59,7 @@ struct Browser
         }
         version(Windows)
         {
-            // windows: taskkill /F /im "name"
+            // windows: taskkill /im "name"
             writeln("not implemented");
         }
         version(linux)
