@@ -6,7 +6,7 @@ module app;
 
 import vibe.vibe;
 import core.thread;
-import std.concurrency;
+import std.concurrency, std.parallelism;
 import std.getopt, std.stdio, std.array;
 import std.process, std.uri;
 
@@ -299,7 +299,7 @@ int main(string[] argz)
     // start server and run available browsers
     auto vibeTid = spawn( &launchVibe, thisTid );
     if (receiveTimeout(dur!"seconds"(10), (SignalVibeReady _vibeReady) {})) {
-        foreach(Browser browser; availableBrowsers) {
+        foreach(Browser browser; taskPool.parallel(availableBrowsers, 5)) {
             browser.open(url);
             if (!receiveTimeout(dur!"seconds"(5), (SignalQUnitDone _qunitDone) {})) {
                 writeln(browser.name ~ " timed out!");
