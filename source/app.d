@@ -43,7 +43,7 @@ struct Browser
         }
         else
         {
-            // windows/posix => Thread( "location" "url" )
+            // windows/posix => new Thread( &startBrowser, "location", "url" )
             // windows: "c:\path\iexplore.exe" "url"
             // linux: /usr/bin/firefox "url"
             writeln("not implemented");
@@ -236,7 +236,7 @@ void launchVibe(Tid tid)
         send(tid, SignalVibeStatus(runEventLoop()));
     } catch( Throwable th ){
         logError("Unhandled exception in event loop: %s", th.toString());
-        send(tid, 2);
+        send(tid, SignalVibeStatus(2));
     }
 }
 
@@ -287,10 +287,10 @@ int main(string[] argz)
 
     auto url = buildURL(args);
     Browser[] availableBrowsers = [
-        // windows: "ie": Browser("iexplore.exe", "C:\\Program Files\\Internet Explorer\\iexplore.exe")
+        // Browser("iexplore.exe", "C:\\Program Files\\Internet Explorer\\iexplore.exe") - windows example
         Browser("Safari"),
         Browser("Google Chrome"),
-        //"firefox": Browser("Firefox"),
+        //"firefox": Browser("Firefox"), // bugged
         Browser("Opera")
     ];
 
