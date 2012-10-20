@@ -290,7 +290,7 @@ int main(string[] argz)
         // Browser("iexplore.exe", "C:\\Program Files\\Internet Explorer\\iexplore.exe") - windows example
         Browser("Safari"),
         Browser("Google Chrome"),
-        //"firefox": Browser("Firefox"), // bugged
+        Browser("Firefox"),
         Browser("Opera")
     ];
 
@@ -319,4 +319,8 @@ int main(string[] argz)
     }
     writeln(vibeStatus);
     return vibeStatus;
+/*
+    auto vibeTid = spawn( &launchVibe, thisTid );
+    return 1;
+*/
 }
