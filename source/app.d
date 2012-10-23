@@ -119,48 +119,63 @@ string recordResults(Json data)
     return "done";
 }
 
+string parseAsserts(Json[] asserts)
+{
+    string[] assertStrings;
+    foreach(Json assertion; asserts) {
+        string assert_string = "        - assert:\n";
+        if (assertion["message"].toString()  != "undefined") {
+            assert_string ~= "            message: " ~ assertion["message"].toString().strip() ~ "\n";
+        }
+        if (assertion["expected"].toString() != "undefined") {
+            assert_string ~= "            " ~ assertion["expected"].toString().replace("\"","").replace("\\", "").strip() ~ "\n";
+        }
+        if (assertion["result"].toString()   != "undefined") {
+            assert_string ~= "            " ~ assertion["result"].toString().replace("\"","").replace("\\", "").strip()   ~ "\n";
+        }
+        if (assertion["diff"].toString()     != "undefined") {
+            assert_string ~= "            " ~ assertion["diff"].toString().replace("\"","").replace("\\", "").strip()     ~ "\n";
+        }
+        if (assertion["source"].toString()   != "undefined") {
+            assert_string ~= "            " ~ assertion["source"].toString().replace("\"","").replace("\\", "").strip()   ~ "\n";
+        }
+        assertStrings ~= assert_string;
+    }
+    return std.array.join(assertStrings);
+}
+
+string parseTests(Json[] tests, ref Json summary)
+{
+    string[] testStrings;
+    foreach(Json result; tests) {
+        if (result["action"].toString() == `"testresults"`) {
+            string test_string = "  - test:\n";
+            test_string ~= "      name: "   ~ result["name"].toString() ~ "\n";
+            test_string ~= "      module: " ~ result["module"].toString() ~ "\n";
+            test_string ~= "      result: " ~ ((result["failed"].toString() != "0") ? "F" : "P") ~ "\n";
+            if (result["failed"].toString() != "0") {
+                test_string ~= "      assertions:\n";
+                Json[] assertions = cast(Json[]) result["assertions"];
+                test_string ~= parseAsserts(assertions);
+            }
+            testStrings ~= test_string;
+        }
+        else if (result["action"].toString() == `"suiteresults"`) {
+            summary = result;
+        }
+    }
+    return std.array.join(testStrings);
+}
+
 string prettyReport(string browserName)
 {
-    string pass_fail;
     Json summary = null;
     string pretty_summary = null;
     string pretty_header = "\n--- !QUnit_Command_Line_Example_Tests\n";
     string pretty_browser = "browser: " ~ qunitResults[browserName][0]["browser"].toString() ~ "\n";
     string pretty_tests = "tests:\n";
-    foreach(Json result; qunitResults[browserName]) {
-        if (result["action"].toString() == q{"testresults"}) {
-            pretty_tests ~= "  - test:\n";
-            pretty_tests ~= "      name: " ~ result["name"].toString() ~ "\n";
-            pass_fail = ((result["failed"].toString() != "0") ? "F" : "P");
-            pretty_tests ~= "      module: " ~ result["module"].toString() ~ "\n";
-            pretty_tests ~= "      result: " ~ pass_fail ~ "\n";
-            if (result["failed"].toString() != "0") {
-                pretty_tests ~= "      assertions:\n";
-                foreach(Json assertion; result["assertions"]) {
-                    pretty_tests ~= "        - assert:\n";
-                    if (assertion["message"].toString() != "undefined") {
-                        pretty_tests ~= "           message: " ~ assertion["message"].toString() ~ "\n";
-                    }
-                    if (assertion["expected"].toString() != "undefined") {
-                        pretty_tests ~= "           " ~ assertion["expected"].toString().replace("\"","").replace("\\", "") ~ "\n";
-                    }
-                    if (assertion["result"].toString() != "undefined") {
-                        pretty_tests ~= "           " ~ assertion["result"].toString().replace("\"","").replace("\\", "")   ~ "\n";
-                    }
-                    if (assertion["diff"].toString() != "undefined") {
-                        pretty_tests ~= "           " ~ assertion["diff"].toString().replace("\"","").replace("\\", "")     ~ "\n";
-                    }
-                    if (assertion["source"].toString() != "undefined") {
-                        pretty_tests ~= "           " ~ assertion["source"].toString().replace("\"","").replace("\\", "")   ~ "\n";
-                    }
-                }
-            }
-        }
-        else if (result["action"].toString() == q{"suiteresults"}) {
-            summary = result;
-        }
-    }
-
+    Json[] browserResults = qunitResults[browserName];
+    pretty_tests ~= parseTests(browserResults, summary);
     string pretty = pretty_header ~ pretty_browser ~ pretty_tests;
     if (summary != null) {
         pretty_summary = "summary:\n";
@@ -176,7 +191,7 @@ string prettyReport(string browserName)
 
 string qUnitDone(Json data)
 {
-    browserReports  ~= prettyReport(getBrowserName(data["browser"]));
+    browserReports ~= prettyReport(getBrowserName(data["browser"]));
     send(mainTid, SignalQUnitDone(true));
     return "done";
 }
@@ -212,8 +227,6 @@ void processReq(HttpServerRequest req, HttpServerResponse res)
 
 static this()
 {
-    qunitResults = null;
-
     auto settings = new HttpServerSettings;
     settings.port = 23432;
     settings.onStart = () => send(mainTid, SignalVibeReady(true));
@@ -296,10 +309,11 @@ int main(string[] argz)
 
     // start server and run available browsers
     auto vibeTid = spawn( &launchVibe, thisTid );
+
     if (receiveTimeout(dur!"seconds"(10), (SignalVibeReady _vibeReady) {})) {
-        foreach(Browser browser; taskPool.parallel(availableBrowsers, 5)) {
+        foreach(Browser browser; availableBrowsers) {
             browser.open(url);
-            if (!receiveTimeout(dur!"seconds"(5), (SignalQUnitDone _qunitDone) {})) {
+            if (!receiveTimeout(dur!"seconds"(10), (SignalQUnitDone _qunitDone) {})) {
                 writeln(browser.name ~ " timed out!");
             }
             browser.close();
@@ -309,7 +323,7 @@ int main(string[] argz)
 
     // stop server after a period of time if it doesnt close by itself
     int vibeStatus = 2; // 2 = some error occured
-    auto received  = receiveTimeout(dur!"seconds"(10), (SignalVibeStatus _vibeStatus) {
+    auto received  = receiveTimeout(dur!"seconds"(300), (SignalVibeStatus _vibeStatus) {
         vibeStatus = _vibeStatus.status;
     });
     if (!received) { externalStopVibe(); }
@@ -319,8 +333,4 @@ int main(string[] argz)
     }
     writeln(vibeStatus);
     return vibeStatus;
-/*
-    auto vibeTid = spawn( &launchVibe, thisTid );
-    return 1;
-*/
 }

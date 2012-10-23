@@ -32,11 +32,11 @@ $(window).load(function () {
 
         testli.find('ol').children('.fail').each(function(index) {
             var assertion = {};
-            assertion['message']  = $(this).find('.test-message').text();
-            assertion['expected'] = $(this).find('.test-expected').text();
-            assertion['result']   = $(this).find('.test-actual').text();
-            //assertion['diff']   = $(this).find('.test-diff').text();
-            //assertion['source']   = $(this).find('.test-source').text();
+            if ($(this).find('.test-message').length  != 0) { assertion['message']  = $(this).find('.test-message').text();  }
+            if ($(this).find('.test-expected').length != 0) { assertion['expected'] = $(this).find('.test-expected').text(); }
+            if ($(this).find('.test-actual').length   != 0) { assertion['result']   = $(this).find('.test-actual').text();   }
+            //if ($(this).find('.test-diff').length   != 0) { assertion['diff']   = $(this).find('.test-diff').text();   }
+            //if ($(this).find('.test-source').length != 0) { assertion['source'] = $(this).find('.test-source').text(); }
             assertions.push(assertion);
         });
         return assertions;
@@ -55,7 +55,9 @@ $(window).load(function () {
     function suiteResults(details) {
         details['action'] = "suiteresults"
         postRequest(details).done(function(data) {
-            postRequest({action:'qunitdone'});
+            setTimeout(function() {
+                postRequest({action:'qunitdone'});
+            }, 500);
         });
     }
 
@@ -75,11 +77,13 @@ $(window).load(function () {
         ok( 1 == "1", "Passed!" );
     });
 
-    asyncTest( "Hey vibe, go do some work", 3, function() {
+    asyncTest( "Hey vibe, go do some work", 5, function() {
         doWorkVibe({data:42}).done(function(vibeResponse) {
             equal( vibeResponse, 'done', 'Vibe should do something');
             equal( "e^(pi*i) + 1", 0, "eulers identity: 0, 1, imaginary, pi, AND e ALL in one formula!?" );
             equal( (2+2), 4, "2+2 == 4");
+            ok( 1 == 2, "fail :(");
+            equal(2, 4, "2 == 4");
             start();
         });
     });
