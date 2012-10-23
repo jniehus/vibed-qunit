@@ -6,7 +6,7 @@ module app;
 
 import vibe.vibe;
 import core.thread;
-import std.concurrency, std.parallelism;
+import std.concurrency;
 import std.getopt, std.stdio, std.array;
 import std.process, std.uri;
 
@@ -43,7 +43,7 @@ struct Browser
         }
         else
         {
-            // windows/posix => new Thread( &startBrowser, "location", "url" )
+            // windows/posix => spawn( &startBrowser, "location", "url" )
             // windows: "c:\path\iexplore.exe" "url"
             // linux: /usr/bin/firefox "url"
             writeln("not implemented");
