@@ -93,6 +93,13 @@ $(window).load(function () {
     test( "world test", 1, function() {
         ok ( true == true, "Passed!");
     });
+
+    asyncTest( "Timeout test", 1, function() {
+        setTimeout(function() {
+            ok(true, "waiting...");
+            start();
+        }, 30); // set to 30000 to mimic a hang
+    });
 });
 
 // END
