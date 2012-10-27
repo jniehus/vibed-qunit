@@ -4,73 +4,25 @@
 
 module app;
 
+// vibe
 import vibe.vibe;
+
+// phobos
 import core.thread;
 import std.concurrency;
 import std.getopt, std.stdio, std.array;
-import std.process, std.uri;
+import std.process, std.uri, std.regex;
 
+// local
+import browser, report, signals;
+
+// module variables
 Json[][string]  qunitResults;
-shared string[] browserReports;
+shared string   browserReports;
 Tid             mainTid;
 
-struct SignalVibeReady
-{
-    bool isReady = false;
-}
 
-struct SignalQUnitDone
-{
-    bool isDone = false;
-}
-
-struct SignalVibeStatus
-{
-    int status;
-}
-
-struct Browser
-{
-    string name;
-    string location;
-
-    void open(string url = "www.nasa.gov")
-    {
-        writeln("opening " ~ name ~ "...");
-        version(OSX)
-        {
-            writeln(shell(`osascript -e 'tell application "`~ name ~`" to open location "`~ url ~ `"'`));
-        }
-        else
-        {
-            // windows/posix => spawn( &startBrowser, "location", "url" )
-            // windows: "c:\path\iexplore.exe" "url"
-            // linux: /usr/bin/firefox "url"
-            writeln("not implemented");
-        }
-    }
-
-    void close()
-    {
-        writeln("closing " ~ name ~ "...");
-        version(OSX)
-        {
-            writeln(shell(`osascript -e 'tell application "`~ name ~`" to quit'`));
-        }
-        version(Windows)
-        {
-            // windows: taskkill /im "name"
-            writeln("not implemented");
-        }
-        version(linux)
-        {
-            // linux: pkill "name"
-            writeln("not implemented");
-        }
-    }
-}
-
-// host the test
+//--- VIBE SERVER THREAD ---
 void handleRequest(HttpServerRequest req, HttpServerResponse res)
 {
 	res.redirect("/index.html");
@@ -87,24 +39,6 @@ string doWork(Json data)
     return "done";
 }
 
-string getBrowserName(Json browserData)
-{
-    string name = "unknown";
-    if (browserData["chrome"].toString() == "true") {
-        name = "chrome";
-    }
-    else if (browserData["mozilla"].toString() == "true") {
-        name = "firefox";
-    }
-    else if (browserData["opera"].toString()   == "true") {
-        name = "opera";
-    }
-    else if (browserData["safari"].toString()  == "true") {
-        name = "safari";
-    }
-    return name;
-}
-
 string recordResults(Json data)
 {
     /*
@@ -119,79 +53,8 @@ string recordResults(Json data)
     return "done";
 }
 
-string parseAsserts(Json[] asserts)
-{
-    string[] assertStrings;
-    foreach(Json assertion; asserts) {
-        string assert_string = "        - assert:\n";
-        if (assertion["message"].toString()  != "undefined") {
-            assert_string ~= "            message: " ~ assertion["message"].toString().strip() ~ "\n";
-        }
-        if (assertion["expected"].toString() != "undefined") {
-            assert_string ~= "            " ~ assertion["expected"].toString().replace("\"","").replace("\\", "").strip() ~ "\n";
-        }
-        if (assertion["result"].toString()   != "undefined") {
-            assert_string ~= "            " ~ assertion["result"].toString().replace("\"","").replace("\\", "").strip()   ~ "\n";
-        }
-        if (assertion["diff"].toString()     != "undefined") {
-            assert_string ~= "            " ~ assertion["diff"].toString().replace("\"","").replace("\\", "").strip()     ~ "\n";
-        }
-        if (assertion["source"].toString()   != "undefined") {
-            assert_string ~= "            " ~ assertion["source"].toString().replace("\"","").replace("\\", "").strip()   ~ "\n";
-        }
-        assertStrings ~= assert_string;
-    }
-    return std.array.join(assertStrings);
-}
-
-string parseTests(Json[] tests, ref Json summary)
-{
-    string[] testStrings;
-    foreach(Json result; tests) {
-        if (result["action"].toString() == `"testresults"`) {
-            string test_string = "  - test:\n";
-            test_string ~= "      name: "   ~ result["name"].toString() ~ "\n";
-            test_string ~= "      module: " ~ result["module"].toString() ~ "\n";
-            test_string ~= "      result: " ~ ((result["failed"].toString() != "0") ? "F" : "P") ~ "\n";
-            if (result["failed"].toString() != "0") {
-                test_string ~= "      assertions:\n";
-                Json[] assertions = cast(Json[]) result["assertions"];
-                test_string ~= parseAsserts(assertions);
-            }
-            testStrings ~= test_string;
-        }
-        else if (result["action"].toString() == `"suiteresults"`) {
-            summary = result;
-        }
-    }
-    return std.array.join(testStrings);
-}
-
-string prettyReport(string browserName)
-{
-    Json summary = null;
-    string pretty_summary = null;
-    string pretty_header = "\n--- !QUnit_Command_Line_Example_Tests\n";
-    string pretty_browser = "browser: " ~ qunitResults[browserName][0]["browser"].toString() ~ "\n";
-    string pretty_tests = "tests:\n";
-    Json[] browserResults = qunitResults[browserName];
-    pretty_tests ~= parseTests(browserResults, summary);
-    string pretty = pretty_header ~ pretty_browser ~ pretty_tests;
-    if (summary != null) {
-        pretty_summary = "summary:\n";
-        pretty_summary ~= "  failed: "  ~ summary["failed"].toString() ~ "\n";
-        pretty_summary ~= "  passed: "  ~ summary["passed"].toString() ~ "\n";
-        pretty_summary ~= "  total: "   ~ summary["total"].toString()  ~ "\n";
-        pretty_summary ~= "  runtime: " ~ summary["runtime"].toString() ~ "\n";
-        pretty ~= pretty_summary;
-    }
-
-    return pretty;
-}
-
 string qUnitDone(Json data)
 {
-    browserReports ~= prettyReport(getBrowserName(data["browser"]));
     send(mainTid, SignalQUnitDone(true));
     return "done";
 }
@@ -225,6 +88,12 @@ void processReq(HttpServerRequest req, HttpServerResponse res)
     res.writeBody(resBody);
 }
 
+void runReport(HttpServerRequest req = null, HttpServerResponse res = null)
+{
+    browserReports = generatePrettyReport(qunitResults);
+    send(mainTid, SignalReportDone(true));
+}
+
 static this()
 {
     auto settings = new HttpServerSettings;
@@ -235,6 +104,7 @@ static this()
     router.get("/", &handleRequest);
     router.get("*", serveStaticFiles("./public/"));
     router.post("/process_req", &processReq);
+    router.get( "/runreport",   &runReport);
     router.get( "/stopvibe",    &stopVibe);
 
     listenHttp(settings, router);
@@ -253,8 +123,8 @@ void launchVibe(Tid tid)
     }
 }
 
-//---
 
+//--- MAIN THREAD ---
 void externalStopVibe()
 {
     auto stopVibeConn = connectTcp("localhost", 23432);
@@ -264,21 +134,13 @@ void externalStopVibe()
                         "\r\n");
 }
 
-string buildURL(Args args)
+void externalRunReport()
 {
-    string baseUrl = "http://localhost:23432/index.html";
-    string url = baseUrl;
-    if (args.testNumber != null) {
-        url = baseUrl ~ "?testNumber=" ~ args.testNumber;
-    }
-
-    // modules take precedence
-    if (args.moduleName != null) {
-        url  = baseUrl ~ "?module=" ~ args.moduleName;
-    }
-
-    url = std.uri.encode(url);
-    return url;
+    auto runReportConn = connectTcp("localhost", 23432);
+    scope(exit) runReportConn.close();
+    runReportConn.write("GET /runreport HTTP/1.1\r\n"
+                        "Host: localhost:23432\r\n"
+                        "\r\n");
 }
 
 struct Args
@@ -287,9 +149,10 @@ struct Args
     string moduleName = null;
 }
 
-// returns 0 if pass
-// returns 1 if fail
-// returns 2 if something went haywire
+// returns -1 if something unexpected happened
+// returns  0 if pass
+// returns  1 if fail
+// returns  2 if vibe server took a shit
 int main(string[] argz)
 {
     //writeln(argz); // sub quote custom args. Example: ~/vibed-qunit$>vibe -- -m '"Module 2"'
@@ -298,7 +161,7 @@ int main(string[] argz)
         "testnumber|t", &args.testNumber,
         "module|m",     &args.moduleName);
 
-    auto url = buildURL(args);
+    auto url = buildURL(args.testNumber, args.moduleName);
     Browser[] availableBrowsers = [
         // Browser("iexplore.exe", "C:\\Program Files\\Internet Explorer\\iexplore.exe") - windows example
         Browser("Safari"),
@@ -307,30 +170,35 @@ int main(string[] argz)
         Browser("Opera")
     ];
 
-    // start server and run available browsers
+    // start server and run browsers
+    bool timeoutOccurred = false;
     auto vibeTid = spawn( &launchVibe, thisTid );
-
     if (receiveTimeout(dur!"seconds"(10), (SignalVibeReady _vibeReady) {})) {
         foreach(Browser browser; availableBrowsers) {
             browser.open(url);
             if (!receiveTimeout(dur!"seconds"(10), (SignalQUnitDone _qunitDone) {})) {
                 writeln(browser.name ~ " timed out!");
+                timeoutOccurred = true;
             }
             browser.close();
         }
-        externalStopVibe();
+
+        externalRunReport();
+        auto reported = receiveTimeout(dur!"seconds"(10), (SignalReportDone _reportDone) {
+            writeln(browserReports);
+        });
     }
 
-    // stop server after a period of time if it doesnt close by itself
-    int vibeStatus = 2; // 2 = some error occured
-    auto received  = receiveTimeout(dur!"seconds"(300), (SignalVibeStatus _vibeStatus) {
-        vibeStatus = _vibeStatus.status;
-    });
-    if (!received) { externalStopVibe(); }
+    // stop the server
+    externalStopVibe();
+    int vibeStatus = -1;
+    receive(
+        (SignalVibeStatus _vStatus) { vibeStatus = _vStatus.status; }
+    );
 
-    foreach(report; browserReports) {
-        writeln(report);
-    }
+    // parse results
+    if (match(browserReports, r"\sresult:\sF\s") || timeoutOccurred) { vibeStatus = 1; }
+
     writeln(vibeStatus);
     return vibeStatus;
 }

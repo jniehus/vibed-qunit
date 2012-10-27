@@ -35,6 +35,8 @@ $(window).load(function () {
             if ($(this).find('.test-message').length  != 0) { assertion['message']  = $(this).find('.test-message').text();  }
             if ($(this).find('.test-expected').length != 0) { assertion['expected'] = $(this).find('.test-expected').text(); }
             if ($(this).find('.test-actual').length   != 0) { assertion['result']   = $(this).find('.test-actual').text();   }
+
+            // excessive details i dont find usefull
             //if ($(this).find('.test-diff').length   != 0) { assertion['diff']   = $(this).find('.test-diff').text();   }
             //if ($(this).find('.test-source').length != 0) { assertion['source'] = $(this).find('.test-source').text(); }
             assertions.push(assertion);
@@ -54,11 +56,13 @@ $(window).load(function () {
     // ajax request to vibe to log results of QUnit suite
     function suiteResults(details) {
         details['action'] = "suiteresults"
-        postRequest(details).done(function(data) {
-            setTimeout(function() {
-                postRequest({action:'qunitdone'});
-            }, 500);
-        });
+        setTimeout(function() {
+            postRequest(details).done(function(data) {
+                setTimeout(function() {
+                    postRequest({action:'qunitdone'});
+                }, 500);
+            });
+        }, 500);
     }
 
     /** SETUP **/
@@ -80,7 +84,7 @@ $(window).load(function () {
     asyncTest( "Hey vibe, go do some work", 5, function() {
         doWorkVibe({data:42}).done(function(vibeResponse) {
             equal( vibeResponse, 'done', 'Vibe should do something');
-            equal( "e^(pi*i) + 1", 0, "eulers identity: 0, 1, imaginary, pi, AND e ALL in one formula!?" );
+            equal( "e^(tau/2*i) + 1", 0, "eulers identity: 0, 1, i, tau/2, AND e ALL in one formula!?" );
             equal( (2+2), 4, "2+2 == 4");
             ok( 1 == 2, "fail :(");
             equal(2, 4, "2 == 4");
