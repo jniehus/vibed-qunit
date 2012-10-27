@@ -65,16 +65,16 @@ $(window).load(function () {
         }, 500);
     }
 
-    /** SETUP **/
 
+    /** SETUP **/
     // call this function after each test is done
     QUnit.testDone(testResults);
 
     // call this function when QUnit is done
     QUnit.done(suiteResults);
 
-    /** NOW ACTUAL TESTS **/
 
+    /** NOW ACTUAL TESTS **/
     //---
     module( "Module 1" );
     test( "hello test", 1, function() {
