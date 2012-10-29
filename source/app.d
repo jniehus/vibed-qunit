@@ -21,6 +21,8 @@ Json[][string]  qunitResults;
 shared string   browserReports;
 Tid             mainTid;
 
+immutable string stop_vibe  = "GET /stopvibe HTTP/1.1\r\n"  "Host: localhost:23432\r\n\r\n";
+immutable string run_report = "GET /runreport HTTP/1.1\r\n" "Host: localhost:23432\r\n\r\n";
 
 //--- VIBE SERVER THREAD ---
 void handleRequest(HttpServerRequest req, HttpServerResponse res)
@@ -125,22 +127,11 @@ void launchVibe(Tid tid)
 
 
 //--- MAIN THREAD ---
-void externalStopVibe()
+void externalRequest(string req)
 {
-    auto stopVibeConn = connectTcp("localhost", 23432);
-    scope(exit) stopVibeConn.close();
-    stopVibeConn.write("GET /stopvibe HTTP/1.1\r\n"
-                        "Host: localhost:23432\r\n"
-                        "\r\n");
-}
-
-void externalRunReport()
-{
-    auto runReportConn = connectTcp("localhost", 23432);
-    scope(exit) runReportConn.close();
-    runReportConn.write("GET /runreport HTTP/1.1\r\n"
-                        "Host: localhost:23432\r\n"
-                        "\r\n");
+    auto reqVibeConn = connectTcp("localhost", 23432);
+    scope(exit) reqVibeConn.close();
+    reqVibeConn.write(req);
 }
 
 struct Args
@@ -165,9 +156,9 @@ int main(string[] argz)
     Browser[] availableBrowsers = [
         // Browser("iexplore.exe", "C:\\Program Files\\Internet Explorer\\iexplore.exe") - windows example
         Browser("Safari"),
-        Browser("Google Chrome"),
-        Browser("Firefox"),
-        Browser("Opera")
+        //Browser("Google Chrome"),
+        //Browser("Firefox"),
+        //Browser("Opera")
     ];
 
     // start server and run browsers
@@ -183,14 +174,14 @@ int main(string[] argz)
             browser.close();
         }
 
-        externalRunReport();
+        externalRequest(run_report);
         auto reported = receiveTimeout(dur!"seconds"(10), (SignalReportDone _reportDone) {
             writeln(browserReports);
         });
     }
 
     // stop the server
-    externalStopVibe();
+    externalRequest(stop_vibe);
     int vibeStatus = -1;
     receive(
         (SignalVibeStatus _vStatus) { vibeStatus = _vStatus.status; }
