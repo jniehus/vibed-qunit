@@ -154,11 +154,11 @@ int main(string[] argz)
 
     auto url = buildURL(args.testNumber, args.moduleName);
     Browser[] availableBrowsers = [
-        // Browser("iexplore.exe", "C:\\Program Files\\Internet Explorer\\iexplore.exe") - windows example
+        //Browser("iexplore.exe", "C:\\Program Files\\Internet Explorer\\iexplore.exe") // windows example
         Browser("Safari"),
-        //Browser("Google Chrome"),
-        //Browser("Firefox"),
-        //Browser("Opera")
+        Browser("Google Chrome"),
+        Browser("Firefox"),
+        Browser("Opera")
     ];
 
     // start server and run browsers
@@ -174,6 +174,7 @@ int main(string[] argz)
             browser.close();
         }
 
+        // when browsers are done run the report
         externalRequest(run_report);
         auto reported = receiveTimeout(dur!"seconds"(10), (SignalReportDone _reportDone) {
             writeln(browserReports);
@@ -189,7 +190,6 @@ int main(string[] argz)
 
     // parse results
     if (match(browserReports, r"\sresult:\sF\s") || timeoutOccurred) { vibeStatus = 1; }
-
     writeln(vibeStatus);
     return vibeStatus;
 }
