@@ -154,17 +154,19 @@ int main(string[] argz)
 
     auto url = buildURL(args.testNumber, args.moduleName);
     Browser[] availableBrowsers = [
-        //Browser("iexplore.exe", "C:\\Program Files\\Internet Explorer\\iexplore.exe") // windows example
-        Browser("Safari"),
-        Browser("Google Chrome"),
-        Browser("Firefox"),
-        Browser("Opera")
+        //Browser("iexplore.exe", "C:\\Program Files\\Internet Explorer\\iexplore.exe"),         // windows
+        //Browser("chrome.exe",   "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"), // windows
+        //Browser("firefox.exe",  "C:\\Program Files\\Mozilla Firefox\\firefox.exe"),            // windows
+        Browser("Firefox"),       // mac
+        Browser("Google Chrome"), // mac
+        Browser("Safari"),        // mac
+        Browser("Opera")          // mac
     ];
 
     // start server and run browsers
     bool timeoutOccurred = false;
     auto vibeTid = spawn( &launchVibe, thisTid );
-    if (receiveTimeout(dur!"seconds"(10), (SignalVibeReady _vibeReady) {})) {
+    receiveTimeout(dur!"seconds"(10), (SignalVibeReady _vibeReady) {
         foreach(Browser browser; availableBrowsers) {
             browser.open(url);
             if (!receiveTimeout(dur!"seconds"(10), (SignalQUnitDone _qunitDone) {})) {
@@ -179,7 +181,7 @@ int main(string[] argz)
         auto reported = receiveTimeout(dur!"seconds"(10), (SignalReportDone _reportDone) {
             writeln(browserReports);
         });
-    }
+    });
 
     // stop the server
     externalRequest(stop_vibe);

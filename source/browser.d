@@ -5,6 +5,7 @@
 module browser;
 
 // phobos
+import std.concurrency, std.regex;
 import std.stdio, std.process, std.uri;
 
 string buildURL(string testNumber = null, string moduleName = null)
@@ -24,24 +25,45 @@ string buildURL(string testNumber = null, string moduleName = null)
     return url;
 }
 
+void startBrowser(Tid tid, string location, string url)
+{
+    try {
+        writeln( shell("\"" ~ location ~ "\" " ~ url) );
+    }
+    catch {
+        send(tid, 1);
+    }
+}
+
 struct Browser
 {
     string name;
     string location;
+
+    string escapeCmdLineChars(string cmdStr)
+    {
+        auto nonAlpha = std.regex.regex(r"[^a-zA-Z]","g");
+        version(Windows)
+        {
+            return std.regex.replace(cmdStr, nonAlpha, "^$&");
+        }
+        version(linux)
+        {
+            return std.regex.replace(cmdStr, nonAlpha, "\\$&");
+        }
+    }
 
     void open(string url = "www.nasa.gov")
     {
         writeln("opening " ~ name ~ "...");
         version(OSX)
         {
-            writeln(shell(`osascript -e 'tell application "`~ name ~`" to open location "`~ url ~ `"'`));
+            writeln(shell(`osascript -e 'tell application "` ~ name ~ `" to open location "` ~ url ~ `"'`));
         }
         else
         {
-            // windows/posix => spawn( &startBrowser, "location", "url" )
-            // windows: "c:\path\iexplore.exe" "url"
-            // linux: /usr/bin/firefox "url"
-            writeln("not implemented");
+            url = escapeCmdLineChars(url);
+            spawn( &startBrowser, thisTid, location, url );
         }
     }
 
@@ -50,17 +72,15 @@ struct Browser
         writeln("closing " ~ name ~ "...");
         version(OSX)
         {
-            writeln(shell(`osascript -e 'tell application "`~ name ~`" to quit'`));
+            writeln(shell(`osascript -e 'tell application "` ~ name ~ `" to quit'`));
         }
         version(Windows)
         {
-            // windows: taskkill /im "name"
-            writeln("not implemented");
+            writeln( shell("taskkill /F /im " ~ name) );
         }
         version(linux)
         {
-            // linux: pkill "name"
-            writeln("not implemented");
+            writeln( shell("pkill " ~ name) );
         }
     }
 }
