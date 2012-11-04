@@ -42,15 +42,17 @@ struct Browser
 
     string escapeCmdLineChars(string cmdStr)
     {
+        string escapeCmdStr;
         auto nonAlpha = std.regex.regex(r"[^a-zA-Z]","g");
         version(Windows)
         {
-            return std.regex.replace(cmdStr, nonAlpha, "^$&");
+            escapeCmdStr = std.regex.replace(cmdStr, nonAlpha, "^$&");
         }
         version(linux)
         {
-            return std.regex.replace(cmdStr, nonAlpha, "\\$&");
+            escapeCmdStr = std.regex.replace(cmdStr, nonAlpha, "\\$&");
         }
+        return escapeCmdStr;
     }
 
     void open(string url = "www.nasa.gov")
