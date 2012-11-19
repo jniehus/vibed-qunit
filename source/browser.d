@@ -6,7 +6,31 @@ module browser;
 
 // phobos
 import std.concurrency, std.regex;
-import std.stdio, std.process, std.uri;
+import std.stdio, std.process, std.uri, std.path, std.file;
+
+version(OSX)
+{
+    enum string[string] info = [
+        "chrome"  : "Google Chrome",
+        "safari"  : "Safari",
+        "firefox" : "Firefox",
+        "opera"   : "Opera"
+    ];
+}
+version(Windows)
+{
+    enum string[string] info = [
+        "chrome"  : "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+        "ie"      : "C:\\Program Files\\Internet Explorer\\iexplore.exe",
+        "firefox" : "C:\\Program Files\\Mozilla Firefox\\firefox.exe",
+        "opera"   : "C:\\Program Files\\Opera\\opera.exe"
+    ];
+}
+version(linux)
+{
+    // not implemented
+}
+
 
 string buildURL(string testNumber = null, string moduleName = null)
 {
@@ -38,7 +62,20 @@ void startBrowser(Tid tid, string location, string url)
 struct Browser
 {
     string name;
-    string location;
+    string cmdName;
+
+    this(string name) {
+        this.name = name;
+        this.cmdName = info[name];
+        this.clearSignal();
+    }
+
+    void clearSignal()
+    {
+        if(exists(name ~ "Done")) {
+            remove(name ~ "Done");
+        }
+    }
 
     string escapeCmdLineChars(string cmdStr)
     {
@@ -60,12 +97,12 @@ struct Browser
         writeln("opening " ~ name ~ "...");
         version(OSX)
         {
-            writeln(shell(`osascript -e 'tell application "` ~ name ~ `" to open location "` ~ url ~ `"'`));
+            writeln(shell(`osascript -e 'tell application "` ~ cmdName ~ `" to open location "` ~ url ~ `"'`));
         }
         else
         {
             url = escapeCmdLineChars(url);
-            spawn( &startBrowser, thisTid, location, url );
+            spawn( &startBrowser, thisTid, cmdName, url );
         }
     }
 
@@ -74,15 +111,17 @@ struct Browser
         writeln("closing " ~ name ~ "...");
         version(OSX)
         {
-            writeln(shell(`osascript -e 'tell application "` ~ name ~ `" to quit'`));
+            writeln(shell(`osascript -e 'tell application "` ~ cmdName ~ `" to quit'`));
         }
         version(Windows)
         {
-            writeln( shell("taskkill /F /im " ~ name) );
+            string exeName = baseName(cmdName);
+            writeln( shell("taskkill /F /im " ~ exeName) );
         }
         version(linux)
         {
-            writeln( shell("pkill " ~ name) );
+            string exeName = baseName(cmdName);
+            writeln( shell("pkill " ~ exeName) );
         }
     }
 }

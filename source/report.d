@@ -8,6 +8,7 @@ module report;
 import vibe.data.json;
 
 // phobos
+import std.parallelism;
 import std.array, std.string;
 
 string getBrowserName(Json browserData)
@@ -56,7 +57,7 @@ string parseAsserts(Json[] asserts)
 string parseTests(Json[] tests, ref Json summary)
 {
     string[] testStrings;
-    foreach(Json result; tests) {
+    foreach(result; taskPool.parallel(tests, 1)) {
         if (result["action"].toString() == `"testresults"`) {
             string test_string = "  - test:\n";
             test_string ~= "      name: "   ~ result["name"].toString() ~ "\n";
@@ -67,7 +68,7 @@ string parseTests(Json[] tests, ref Json summary)
                 Json[] assertions = cast(Json[]) result["assertions"];
                 test_string ~= parseAsserts(assertions);
             }
-            testStrings ~= test_string;
+            synchronized { testStrings ~= test_string; }
         }
         else if (result["action"].toString() == `"suiteresults"`) {
             summary = result;
@@ -99,8 +100,10 @@ string prettyReport(Json[] browserResults)
 string generatePrettyReport(Json[][string] qunitResults)
 {
     string fancyReport = "";
-    foreach(string browser, Json[] browserResults; qunitResults) {
-        fancyReport ~= prettyReport(browserResults);
+    foreach(browserResults; taskPool.parallel(qunitResults.byValue(), 1)) {
+        synchronized {
+            fancyReport ~= prettyReport(browserResults);
+        }
     }
     return fancyReport;
 }

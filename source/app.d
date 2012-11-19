@@ -9,9 +9,9 @@ import vibe.vibe;
 
 // phobos
 import core.thread;
-import std.concurrency;
+import std.concurrency, std.parallelism;
 import std.getopt, std.stdio, std.array;
-import std.process, std.uri, std.regex;
+import std.process, std.uri, std.regex, std.file;
 
 // local
 import browser, report, signals;
@@ -51,13 +51,22 @@ string recordResults(Json data)
       last testRun for each browser
     */
 
-    qunitResults[getBrowserName(data["browser"])] ~= data;
+    synchronized {
+        qunitResults[getBrowserName(data["browser"])] ~= data;
+    }
     return "done";
+}
+
+void createSignal(string name)
+{
+    auto f = File(name ~ "Done", "w");
+    f.write(name ~ " done");
 }
 
 string qUnitDone(Json data)
 {
-    send(mainTid, SignalQUnitDone(true));
+    string name = getBrowserName(data["browser"]);
+    createSignal(name);
     return "done";
 }
 
@@ -134,6 +143,19 @@ void externalRequest(string req)
     reqVibeConn.write(req);
 }
 
+bool waitForSignal(string signalName, int timeout = 10)
+{
+    int count = 0;
+    while(!exists(signalName) && count < timeout) {
+        core.thread.Thread.sleep(dur!"seconds"(1));
+        count++;
+    }
+    if (count == timeout) {
+        return false;
+    }
+    return true;
+}
+
 struct Args
 {
     string testNumber = null;
@@ -153,25 +175,54 @@ int main(string[] argz)
         "module|m",     &args.moduleName);
 
     auto url = buildURL(args.testNumber, args.moduleName);
-    Browser[] availableBrowsers = [
-        //Browser("iexplore.exe", "C:\\Program Files\\Internet Explorer\\iexplore.exe"),         // windows
-        //Browser("chrome.exe",   "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"), // windows
-        //Browser("firefox.exe",  "C:\\Program Files\\Mozilla Firefox\\firefox.exe"),            // windows
-        Browser("Firefox"),       // mac
-        Browser("Google Chrome"), // mac
-        Browser("Safari"),        // mac
-        Browser("Opera")          // mac
+    auto availableBrowsers = [
+        //Browser("ie"),    // windows only
+        Browser("firefox"),
+        Browser("chrome"),
+        Browser("safari"),  // mac only
+        Browser("opera")
     ];
 
     // start server and run browsers
     bool timeoutOccurred = false;
     auto vibeTid = spawn( &launchVibe, thisTid );
     receiveTimeout(dur!"seconds"(10), (SignalVibeReady _vibeReady) {
-        foreach(Browser browser; availableBrowsers) {
+        foreach(browser; taskPool.parallel(availableBrowsers, 1)) {
             browser.open(url);
-            if (!receiveTimeout(dur!"seconds"(10), (SignalQUnitDone _qunitDone) {})) {
-                writeln(browser.name ~ " timed out!");
-                timeoutOccurred = true;
+            switch(browser.name)
+            {
+                case "firefox":
+                    if (!waitForSignal("firefoxDone", 10)) {
+                        writeln(browser.name ~ " timed out!");
+                        timeoutOccurred = true;
+                    }
+                    break;
+                case "chrome":
+                    if (!waitForSignal("chromeDone", 10)) {
+                        writeln(browser.name ~ " timed out!");
+                        timeoutOccurred = true;
+                    }
+                    break;
+                case "safari":
+                    if (!waitForSignal("safariDone", 10)) {
+                        writeln(browser.name ~ " timed out!");
+                        timeoutOccurred = true;
+                    }
+                    break;
+                case "opera":
+                    if (!waitForSignal("operaDone", 10)) {
+                        writeln(browser.name ~ " timed out!");
+                        timeoutOccurred = true;
+                    }
+                    break;
+                case "ie":
+                    if (!waitForSignal("ieDone", 10)) {
+                        writeln(browser.name ~ " timed out!");
+                        timeoutOccurred = true;
+                    }
+                    break;
+                default:
+                    writeln("nothing");
             }
             browser.close();
         }
