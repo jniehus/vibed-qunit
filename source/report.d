@@ -68,7 +68,9 @@ string parseTests(Json[] tests, ref Json summary)
                 Json[] assertions = cast(Json[]) result["assertions"];
                 test_string ~= parseAsserts(assertions);
             }
-            synchronized { testStrings ~= test_string; }
+            synchronized {
+                testStrings ~= test_string;
+            }
         }
         else if (result["action"].toString() == `"suiteresults"`) {
             summary = result;

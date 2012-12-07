@@ -31,7 +31,6 @@ version(linux)
     // not implemented
 }
 
-
 string buildURL(string testNumber = null, string moduleName = null)
 {
     string baseUrl = "http://localhost:23432/index.html";
@@ -64,17 +63,10 @@ struct Browser
     string name;
     string cmdName;
 
-    this(string name) {
-        this.name = name;
-        this.cmdName = info[name];
-        this.clearSignal();
-    }
-
-    void clearSignal()
+    this(string name)
     {
-        if(exists(name ~ "Done")) {
-            remove(name ~ "Done");
-        }
+        this.name    = name;
+        this.cmdName = info[name];
     }
 
     string escapeCmdLineChars(string cmdStr)

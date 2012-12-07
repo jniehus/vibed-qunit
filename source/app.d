@@ -9,6 +9,7 @@ import vibe.vibe;
 
 // phobos
 import core.thread;
+import std.algorithm;
 import std.concurrency, std.parallelism;
 import std.getopt, std.stdio, std.array;
 import std.process, std.uri, std.regex, std.file;
@@ -21,8 +22,14 @@ Json[][string]  qunitResults;
 shared string   browserReports;
 Tid             mainTid;
 
-immutable string stop_vibe  = "GET /stopvibe HTTP/1.1\r\n"  "Host: localhost:23432\r\n\r\n";
-immutable string run_report = "GET /runreport HTTP/1.1\r\n" "Host: localhost:23432\r\n\r\n";
+shared(bool) chromeDone  = false;
+shared(bool) firefoxDone = false;
+shared(bool) operaDone   = false;
+shared(bool) safariDone  = false;
+shared(bool) ieDone      = false;
+
+enum string stop_vibe  = "GET /stopvibe HTTP/1.1\r\n"  "Host: localhost:23432\r\n\r\n";
+enum string run_report = "GET /runreport HTTP/1.1\r\n" "Host: localhost:23432\r\n\r\n";
 
 //--- VIBE SERVER THREAD ---
 void handleRequest(HttpServerRequest req, HttpServerResponse res)
@@ -57,16 +64,25 @@ string recordResults(Json data)
     return "done";
 }
 
-void createSignal(string name)
-{
-    auto f = File(name ~ "Done", "w");
-    f.write(name ~ " done");
-}
-
 string qUnitDone(Json data)
 {
     string name = getBrowserName(data["browser"]);
-    createSignal(name);
+    switch(name)
+    {
+        case "chrome":
+            chromeDone  = true; break;
+        case "firefox":
+            firefoxDone = true; break;
+        case "opera":
+            operaDone   = true; break;
+        case "safari":
+            safariDone  = true; break;
+        case "ie":
+            ieDone      = true; break;
+        default:
+            // do nothing
+    }
+    //send(mainTid, SignalQUnitDone(name));
     return "done";
 }
 
@@ -143,10 +159,10 @@ void externalRequest(string req)
     reqVibeConn.write(req);
 }
 
-bool waitForSignal(string signalName, int timeout = 10)
+bool waitForSignal(ref shared(bool) signal, int timeout = 10)
 {
     int count = 0;
-    while(!exists(signalName) && count < timeout) {
+    while(!signal && count < timeout) {
         core.thread.Thread.sleep(dur!"seconds"(1));
         count++;
     }
@@ -192,31 +208,31 @@ int main(string[] argz)
             switch(browser.name)
             {
                 case "firefox":
-                    if (!waitForSignal("firefoxDone", 10)) {
+                    if (!waitForSignal(firefoxDone, 10)) {
                         writeln(browser.name ~ " timed out!");
                         timeoutOccurred = true;
                     }
                     break;
                 case "chrome":
-                    if (!waitForSignal("chromeDone", 10)) {
+                    if (!waitForSignal(chromeDone, 10)) {
                         writeln(browser.name ~ " timed out!");
                         timeoutOccurred = true;
                     }
                     break;
                 case "safari":
-                    if (!waitForSignal("safariDone", 10)) {
+                    if (!waitForSignal(safariDone, 10)) {
                         writeln(browser.name ~ " timed out!");
                         timeoutOccurred = true;
                     }
                     break;
                 case "opera":
-                    if (!waitForSignal("operaDone", 10)) {
+                    if (!waitForSignal(operaDone, 10)) {
                         writeln(browser.name ~ " timed out!");
                         timeoutOccurred = true;
                     }
                     break;
                 case "ie":
-                    if (!waitForSignal("ieDone", 10)) {
+                    if (!waitForSignal(ieDone, 10)) {
                         writeln(browser.name ~ " timed out!");
                         timeoutOccurred = true;
                     }
