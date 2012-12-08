@@ -90,11 +90,14 @@ string prettyReport(Json[] browserResults)
     string pretty = pretty_header ~ pretty_browser ~ pretty_tests;
     if (summary != null) {
         pretty_summary = "summary:\n";
-        pretty_summary ~= "  failed: "  ~ summary["failed"].toString() ~ "\n";
-        pretty_summary ~= "  passed: "  ~ summary["passed"].toString() ~ "\n";
-        pretty_summary ~= "  total: "   ~ summary["total"].toString()  ~ "\n";
+        pretty_summary ~= "  failed: "  ~ summary["failed"].toString()  ~ "\n";
+        pretty_summary ~= "  passed: "  ~ summary["passed"].toString()  ~ "\n";
+        pretty_summary ~= "  total: "   ~ summary["total"].toString()   ~ "\n";
         pretty_summary ~= "  runtime: " ~ summary["runtime"].toString() ~ "\n";
         pretty ~= pretty_summary;
+    }
+    else {
+        pretty ~= "timeout: the browser stopped repsonding!\n";
     }
     return pretty;
 }

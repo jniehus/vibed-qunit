@@ -28,24 +28,10 @@ version(Windows)
 }
 version(linux)
 {
-    // not implemented
-}
-
-string buildURL(string testNumber = null, string moduleName = null)
-{
-    string baseUrl = "http://localhost:23432/index.html";
-    string url = baseUrl;
-    if (testNumber != null) {
-        url = baseUrl ~ "?testNumber=" ~ testNumber;
-    }
-
-    // modules take precedence
-    if (moduleName != null) {
-        url  = baseUrl ~ "?module=" ~ moduleName;
-    }
-
-    url = std.uri.encode(url);
-    return url;
+    enum string[string] info = [
+        "chrome"  : "/usr/bin/google-chrome",
+        "firefox" : "/usr/bin/firefox"
+    ];
 }
 
 void startBrowser(Tid tid, string location, string url)
@@ -113,6 +99,8 @@ struct Browser
         version(linux)
         {
             string exeName = baseName(cmdName);
+            // pkill "google-chrome" doesnt work but `pkill chrome` does
+            if (exeName == "google-chrome") { exeName = "chrome"; }
             writeln( shell("pkill " ~ exeName) );
         }
     }

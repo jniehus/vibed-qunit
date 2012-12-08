@@ -92,23 +92,20 @@ void processReq(HttpServerRequest req, HttpServerResponse res)
     string resBody;
     switch(req.json["action"].toString())
     {
-    case `"dowork"`:
-        resBody = doWork(req.json);
-        break;
-    case `"testresults"`:
-        resBody = recordResults(req.json);
-        break;
-    case `"suiteresults"`:
-        resBody = recordResults(req.json);
-        break;
-    case `"qunitdone"`:
-        resBody = qUnitDone(req.json);
-        break;
-    case `"stopvibe"`:
-        stopVibe();
-        break;
-    default:
-        resBody = "fail";
+        case `"dowork"`:
+            resBody = doWork(req.json); break;
+        case `"testresults"`:
+            resBody = recordResults(req.json); break;
+        case `"suiteresults"`:
+            resBody = recordResults(req.json); break;
+        case `"qunitbegin"`:
+            resBody = recordResults(req.json); break;
+        case `"qunitdone"`:
+            resBody = qUnitDone(req.json); break;
+        case `"stopvibe"`:
+            stopVibe(); break;
+        default:
+            resBody = "fail";
     }
 
     res.headers["Access-Control-Allow-Origin"] = "*";
@@ -172,6 +169,46 @@ bool waitForSignal(ref shared(bool) signal, int timeout = 10)
     return true;
 }
 
+void runBrowsers(Browser[] availableBrowsers, string url)
+{
+    foreach(browser; taskPool.parallel(availableBrowsers, 1)) {
+        browser.open(url);
+        switch(browser.name)
+        {
+            case "firefox":
+                waitForSignal(firefoxDone, 10); break;
+            case "chrome":
+                waitForSignal(chromeDone, 10);  break;
+            case "safari":
+                waitForSignal(safariDone, 10);  break;
+            case "opera":
+                waitForSignal(operaDone, 10);   break;
+            case "ie":
+                waitForSignal(ieDone, 10);      break;
+            default:
+                // do nothing
+        }
+        browser.close();
+    }
+}
+
+string buildURL(string testNumber = null, string moduleName = null)
+{
+    string baseUrl = "http://localhost:23432/index.html";
+    string url = baseUrl;
+    if (testNumber != null) {
+        url = baseUrl ~ "?testNumber=" ~ testNumber;
+    }
+
+    // modules take precedence
+    if (moduleName != null) {
+        url  = baseUrl ~ "?module=" ~ moduleName;
+    }
+
+    url = std.uri.encode(url);
+    return url;
+}
+
 struct Args
 {
     string testNumber = null;
@@ -191,6 +228,8 @@ int main(string[] argz)
         "module|m",     &args.moduleName);
 
     auto url = buildURL(args.testNumber, args.moduleName);
+
+    // can make command line arg
     auto availableBrowsers = [
         //Browser("ie"),    // windows only
         Browser("firefox"),
@@ -200,48 +239,9 @@ int main(string[] argz)
     ];
 
     // start server and run browsers
-    bool timeoutOccurred = false;
     auto vibeTid = spawn( &launchVibe, thisTid );
     receiveTimeout(dur!"seconds"(10), (SignalVibeReady _vibeReady) {
-        foreach(browser; taskPool.parallel(availableBrowsers, 1)) {
-            browser.open(url);
-            switch(browser.name)
-            {
-                case "firefox":
-                    if (!waitForSignal(firefoxDone, 10)) {
-                        writeln(browser.name ~ " timed out!");
-                        timeoutOccurred = true;
-                    }
-                    break;
-                case "chrome":
-                    if (!waitForSignal(chromeDone, 10)) {
-                        writeln(browser.name ~ " timed out!");
-                        timeoutOccurred = true;
-                    }
-                    break;
-                case "safari":
-                    if (!waitForSignal(safariDone, 10)) {
-                        writeln(browser.name ~ " timed out!");
-                        timeoutOccurred = true;
-                    }
-                    break;
-                case "opera":
-                    if (!waitForSignal(operaDone, 10)) {
-                        writeln(browser.name ~ " timed out!");
-                        timeoutOccurred = true;
-                    }
-                    break;
-                case "ie":
-                    if (!waitForSignal(ieDone, 10)) {
-                        writeln(browser.name ~ " timed out!");
-                        timeoutOccurred = true;
-                    }
-                    break;
-                default:
-                    writeln("nothing");
-            }
-            browser.close();
-        }
+        runBrowsers(availableBrowsers, url);
 
         // when browsers are done run the report
         externalRequest(run_report);
@@ -258,7 +258,9 @@ int main(string[] argz)
     );
 
     // parse results
-    if (match(browserReports, r"\sresult:\sF\s") || timeoutOccurred) { vibeStatus = 1; }
+    if (match(browserReports, regex(r"\sresult:\sF\s|^timeout:", "gm"))) {
+        vibeStatus = 1;
+    }
     writeln(vibeStatus);
     return vibeStatus;
 }

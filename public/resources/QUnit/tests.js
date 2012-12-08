@@ -44,13 +44,21 @@ $(window).load(function () {
         return assertions;
     }
 
+    function suiteBegin() {
+        postRequest({ 'action': "qunitbegin" }).done(function() {
+            /* do nothing for now */
+        });
+    }
+
     // ajax request to vibe to log results of a specific QUnit test case
     function testResults(details) {
         details['action'] = "testresults"
         if (details['failed'] > 0) {
             details['assertions'] = parseQunitTestAssertions(details)
         }
-        postRequest(details).done(function() { /* do nothing for now */ });
+        postRequest(details).done(function() {
+            /* do nothing for now */
+        });
     }
 
     // ajax request to vibe to log results of QUnit suite
@@ -67,6 +75,9 @@ $(window).load(function () {
 
 
     /** SETUP **/
+    // call this method to record that browsers actually started
+    QUnit.begin( suiteBegin() );
+
     // call this function after each test is done
     QUnit.testDone(testResults);
 
@@ -99,10 +110,12 @@ $(window).load(function () {
     });
 
     asyncTest( "Timeout test", 1, function() {
+        timeout = 30;
+        if ($.browser["chrome"] == true) { timeout = 30000; } // mimic timeout for chrome
         setTimeout(function() {
             ok(true, "waiting...");
             start();
-        }, 30); // set to 30000 to mimic a hang
+        }, timeout);
     });
 });
 
