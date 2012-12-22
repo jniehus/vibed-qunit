@@ -9,7 +9,7 @@ import vibe.data.json;
 
 // phobos
 import std.parallelism;
-import std.array, std.string;
+import std.array, std.string, std.stdio;
 
 string getBrowserName(Json browserData)
 {
@@ -107,7 +107,9 @@ string generatePrettyReport(Json[][string] qunitResults)
     string fancyReport = "";
     foreach(browserResults; taskPool.parallel(qunitResults.byValue(), 1)) {
         synchronized {
-            fancyReport ~= prettyReport(browserResults);
+            string browserReport = prettyReport(browserResults);
+            fancyReport ~= browserReport;
+            //File(getBrowserName(browserResults[0]["browser"]) ~ "_report.yml", "w").write(browserReport);
         }
     }
     return fancyReport;

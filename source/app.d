@@ -261,6 +261,7 @@ int main(string[] argz)
     if (match(browserReports, regex(r"\sresult:\sF\s|^timeout:", "gm"))) {
         vibeStatus = 1;
     }
+
     writeln(vibeStatus);
     return vibeStatus;
 }
