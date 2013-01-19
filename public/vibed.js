@@ -1,12 +1,31 @@
+var parameters = null;
+
+$.extend({
+    // jQuery method extension to capture any parameters that were passed in via the URL
+    // from: http://jquery-howto.blogspot.com/2009/09/get-url-parameters-values-with-jquery.html
+    getUrlVars: function() {
+        var vars = {}, hash;
+        var hashes = window.location.href.slice(window.location.href.indexOf('?') + 1).split('&');
+        for(var i = 0; i < hashes.length; i++) {
+            hash = hashes[i].split('=');
+            vars[decodeURIComponent(hash[0])] = decodeURIComponent(hash[1]);
+        }
+        return vars;
+    },
+
+    getUrlVar: function(name) {
+        return $.getUrlVars()[name];
+    }
+});
+
 $(document).ready(function() {
     /** VIBE SETUP **/
-    var vibe = 'http://localhost:23432';
+    parameters = $.getUrlVars();
+    var vibe   = 'http://' + parameters["host"] + ':' + parameters["port"]
 
     // generic method to post requests to vibe
     function postRequest (req) {
-        // this will tag each request with a specific
-        // browser. This should help with parallelization
-        req["browser"] = $.browser;
+        req["browser"] = parameters["browser"];
         return $.ajax({
             type: 'POST',
             url: vibe + '/process_req',
@@ -72,6 +91,4 @@ $(document).ready(function() {
 
     // call this function when QUnit is done
     QUnit.done( suiteResults );
-
 });
-// end

@@ -48,38 +48,72 @@ struct Browser
 {
     string name;
     string cmdName;
+    string host;
+    string port;
+    string testNumber;
+    string moduleName;
+    string url;
 
-    this(string name)
+    this(string name, string testNumber = null, string moduleName = null, string host = "localhost", string port = "23432")
     {
-        this.name    = name;
-        this.cmdName = info[name];
+        this.name       = name;
+        this.cmdName    = info[name];
+        this.testNumber = testNumber;
+        this.moduleName = moduleName;
+        this.host       = host;
+        this.port       = port;
+        this.url = buildURL();
     }
 
-    string escapeCmdLineChars(string cmdStr)
+    string buildURL()
+    {
+        string baseUrl = "http://" ~ host ~ ":" ~ port ~ "/index.html";
+        string url = baseUrl;
+        if (testNumber) {
+            url = baseUrl ~ "?testNumber=" ~ testNumber;
+        }
+
+        // modules take precedence
+        if (moduleName) {
+            url = baseUrl ~ "?module=" ~ moduleName;
+        }
+
+        if (testNumber || moduleName) {
+            url ~= "&browser=";
+        }
+        else {
+            url ~= "?browser=";
+        }
+        url ~= name ~ "&host=" ~ host ~ "&port=" ~ port;
+
+        url = std.uri.encode(url);
+        return url;
+    }
+
+    void escapeCmdLineChars(ref string cmdUrl)
     {
         string escapeCmdStr;
         auto nonAlpha = std.regex.regex(r"[^a-zA-Z]","g");
         version(Windows)
         {
-            escapeCmdStr = std.regex.replace(cmdStr, nonAlpha, "^$&");
+            escapeCmdStr = std.regex.replace(cmdUrl, nonAlpha, "^$&");
         }
         version(linux)
         {
-            escapeCmdStr = std.regex.replace(cmdStr, nonAlpha, "\\$&");
+            escapeCmdStr = std.regex.replace(cmdUrl, nonAlpha, "\\$&");
         }
-        return escapeCmdStr;
     }
 
-    void open(string url = "www.nasa.gov")
+    void open()
     {
-        writeln("opening " ~ name ~ "...");
+        writeln("opening " ~ name ~ " to " ~ url);
         version(OSX)
         {
             writeln(shell(`osascript -e 'tell application "` ~ cmdName ~ `" to open location "` ~ url ~ `"'`));
         }
         else
         {
-            url = escapeCmdLineChars(url);
+            escapeCmdLineChars(url);
             spawn( &startBrowser, thisTid, cmdName, url );
         }
     }

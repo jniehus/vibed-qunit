@@ -1,6 +1,6 @@
 /**
  * Vibe Server
-**/
+ */
 
 module app;
 
@@ -59,14 +59,14 @@ string recordResults(Json data)
     */
 
     synchronized {
-        qunitResults[getBrowserName(data["browser"])] ~= data;
+        qunitResults[data["browser"].toString()] ~= data;
     }
     return "done";
 }
 
 string qUnitDone(Json data)
 {
-    string name = getBrowserName(data["browser"]);
+    string name = data["browser"].toString();
     switch(name)
     {
         case "chrome":
@@ -121,8 +121,8 @@ void runReport(HttpServerRequest req = null, HttpServerResponse res = null)
 static this()
 {
     auto settings = new HttpServerSettings;
-    settings.port = 23432;
     settings.onStart = () => send(mainTid, SignalVibeReady(true));
+    settings.port = 23432;
 
     auto router = new UrlRouter;
     router.get("/", &handleRequest);
@@ -169,44 +169,27 @@ bool waitForSignal(ref shared(bool) signal, int timeout = 10)
     return true;
 }
 
-void runBrowsers(Browser[] availableBrowsers, string url)
+void runBrowsers(Browser[] availableBrowsers)
 {
     foreach(browser; taskPool.parallel(availableBrowsers, 1)) {
-        browser.open(url);
+        browser.open();
         switch(browser.name)
         {
             case "firefox":
-                waitForSignal(firefoxDone, 10); break;
+                waitForSignal(firefoxDone); break;
             case "chrome":
-                waitForSignal(chromeDone, 10);  break;
+                waitForSignal(chromeDone);  break;
             case "safari":
-                waitForSignal(safariDone, 10);  break;
+                waitForSignal(safariDone);  break;
             case "opera":
-                waitForSignal(operaDone, 10);   break;
+                waitForSignal(operaDone);   break;
             case "ie":
-                waitForSignal(ieDone, 10);      break;
+                waitForSignal(ieDone);      break;
             default:
                 // do nothing
         }
         browser.close();
     }
-}
-
-string buildURL(string testNumber = null, string moduleName = null)
-{
-    string baseUrl = "http://localhost:23432/index.html";
-    string url = baseUrl;
-    if (testNumber != null) {
-        url = baseUrl ~ "?testNumber=" ~ testNumber;
-    }
-
-    // modules take precedence
-    if (moduleName != null) {
-        url  = baseUrl ~ "?module=" ~ moduleName;
-    }
-
-    url = std.uri.encode(url);
-    return url;
 }
 
 struct Args
@@ -227,23 +210,21 @@ int main(string[] argz)
         "testnumber|t", &args.testNumber,
         "module|m",     &args.moduleName);
 
-    auto url = buildURL(args.testNumber, args.moduleName);
-
     // can make command line arg
     auto availableBrowsers = [
         //Browser("ie"),    // windows only
-        Browser("firefox"),
-        Browser("chrome"),
-        Browser("safari"),  // mac only
-        Browser("opera")
+        Browser("firefox", args.testNumber, args.moduleName),
+        Browser("chrome",  args.testNumber, args.moduleName),
+        Browser("safari",  args.testNumber, args.moduleName),  // mac only
+        //Browser("opera",   args.testNumber, args.moduleName)
     ];
 
     // start server and run browsers
     auto vibeTid = spawn( &launchVibe, thisTid );
-    receiveTimeout(dur!"seconds"(10), (SignalVibeReady _vibeReady) {
-        runBrowsers(availableBrowsers, url);
+    receiveTimeout(dur!"seconds"(20), (SignalVibeReady _vibeReady) {
+        runBrowsers(availableBrowsers);
 
-        // when browsers are done run the report
+        // when browsers are done run the report **
         externalRequest(run_report);
         auto reported = receiveTimeout(dur!"seconds"(10), (SignalReportDone _reportDone) {
             writeln(browserReports);

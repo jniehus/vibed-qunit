@@ -11,43 +11,22 @@ import vibe.data.json;
 import std.parallelism;
 import std.array, std.string, std.stdio;
 
-string getBrowserName(Json browserData)
-{
-    string name = "unknown";
-    if (browserData["chrome"].toString() == "true") {
-        name = "chrome";
-    }
-    else if (browserData["mozilla"].toString() == "true") {
-        name = "firefox";
-    }
-    else if (browserData["opera"].toString()   == "true") {
-        name = "opera";
-    }
-    else if (browserData["safari"].toString()  == "true") {
-        name = "safari";
-    }
-    return name;
-}
-
 string parseAsserts(Json[] asserts)
 {
     string[] assertStrings;
     foreach(Json assertion; asserts) {
-        string assert_string = "        - assert:\n";
-        if (assertion["message"].toString()  != "undefined") {
-            assert_string ~= "            message: " ~ assertion["message"].toString().strip() ~ "\n";
-        }
+        string assert_string = "  - message: " ~ assertion["message"].toString().strip() ~ "\n";
         if (assertion["expected"].toString() != "undefined") {
-            assert_string ~= "            " ~ assertion["expected"].toString().replace("\"","").replace("\\", "").strip() ~ "\n";
+            assert_string ~=   "    " ~ assertion["expected"].toString().replace("\"","").replace("\\", "").strip() ~ "\n";
         }
         if (assertion["result"].toString()   != "undefined") {
-            assert_string ~= "            " ~ assertion["result"].toString().replace("\"","").replace("\\", "").strip()   ~ "\n";
+            assert_string ~=   "    " ~ assertion["result"].toString().replace("\"","").replace("\\", "").strip()   ~ "\n";
         }
         if (assertion["diff"].toString()     != "undefined") {
-            assert_string ~= "            " ~ assertion["diff"].toString().replace("\"","").replace("\\", "").strip()     ~ "\n";
+            assert_string ~=   "    " ~ assertion["diff"].toString().replace("\"","").replace("\\", "").strip()     ~ "\n";
         }
         if (assertion["source"].toString()   != "undefined") {
-            assert_string ~= "            " ~ assertion["source"].toString().replace("\"","").replace("\\", "").strip()   ~ "\n";
+            assert_string ~=   "    " ~ assertion["source"].toString().replace("\"","").replace("\\", "").strip()   ~ "\n";
         }
         assertStrings ~= assert_string;
     }
@@ -59,12 +38,11 @@ string parseTests(Json[] tests, ref Json summary)
     string[] testStrings;
     foreach(result; taskPool.parallel(tests, 1)) {
         if (result["action"].toString() == `"testresults"`) {
-            string test_string = "  - test:\n";
-            test_string ~= "      name: "   ~ result["name"].toString() ~ "\n";
-            test_string ~= "      module: " ~ result["module"].toString() ~ "\n";
-            test_string ~= "      result: " ~ ((result["failed"].toString() != "0") ? "F" : "P") ~ "\n";
+            string test_string =  "- name: "   ~ result["name"].toString() ~ "\n";
+                   test_string ~= "  module: " ~ result["module"].toString() ~ "\n";
+                   test_string ~= "  result: " ~ ((result["failed"].toString() != "0") ? "F" : "P") ~ "\n";
             if (result["failed"].toString() != "0") {
-                test_string ~= "      assertions:\n";
+                test_string ~= "  assertions:\n";
                 Json[] assertions = cast(Json[]) result["assertions"];
                 test_string ~= parseAsserts(assertions);
             }
