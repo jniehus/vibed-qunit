@@ -188,6 +188,7 @@ void runBrowsers(Browser[] availableBrowsers)
             default:
                 // do nothing
         }
+        //receiveTimeout(dur!"seconds"(20), (SignalQUnitDone _qunitDone){});
         browser.close();
     }
 }
