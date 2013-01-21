@@ -11,7 +11,7 @@ import vibe.vibe;
 import core.thread;
 import std.algorithm;
 import std.concurrency, std.parallelism;
-import std.getopt, std.stdio, std.array;
+import std.getopt, std.stdio, std.array, std.conv;
 import std.process, std.uri, std.regex, std.file;
 
 // local
@@ -21,15 +21,15 @@ import browser, report, signals;
 Json[][string]  qunitResults;
 shared string   browserReports;
 Tid             mainTid;
+shared string   host;
+shared ushort   port;
+int             timeout_counter;
 
-shared(bool) chromeDone  = false;
-shared(bool) firefoxDone = false;
-shared(bool) operaDone   = false;
-shared(bool) safariDone  = false;
-shared(bool) ieDone      = false;
-
-enum string stop_vibe  = "GET /stopvibe HTTP/1.1\r\n"  "Host: localhost:23432\r\n\r\n";
-enum string run_report = "GET /runreport HTTP/1.1\r\n" "Host: localhost:23432\r\n\r\n";
+shared bool chromeDone  = false;
+shared bool firefoxDone = false;
+shared bool operaDone   = false;
+shared bool safariDone  = false;
+shared bool ieDone      = false;
 
 //--- VIBE SERVER THREAD ---
 void handleRequest(HttpServerRequest req, HttpServerResponse res)
@@ -57,7 +57,6 @@ string recordResults(Json data)
       then a report generator will pull data from the
       last testRun for each browser
     */
-
     synchronized {
         qunitResults[data["browser"].toString()] ~= data;
     }
@@ -66,21 +65,21 @@ string recordResults(Json data)
 
 string qUnitDone(Json data)
 {
-    string name = data["browser"].toString();
+    string name = to!string(data["browser"]);
     switch(name)
     {
-        case "chrome":
+        case `"chrome"`:
             chromeDone  = true; break;
-        case "firefox":
+        case `"firefox"`:
             firefoxDone = true; break;
-        case "opera":
+        case `"opera"`:
             operaDone   = true; break;
-        case "safari":
+        case `"safari"`:
             safariDone  = true; break;
-        case "ie":
+        case `"ie"`:
             ieDone      = true; break;
         default:
-            // do nothing
+            writeln(name ~ " not recognized!");
     }
     //send(mainTid, SignalQUnitDone(name));
     return "done";
@@ -122,7 +121,7 @@ static this()
 {
     auto settings = new HttpServerSettings;
     settings.onStart = () => send(mainTid, SignalVibeReady(true));
-    settings.port = 23432;
+    settings.port = port;
 
     auto router = new UrlRouter;
     router.get("/", &handleRequest);
@@ -151,12 +150,12 @@ void launchVibe(Tid tid)
 //--- MAIN THREAD ---
 void externalRequest(string req)
 {
-    auto reqVibeConn = connectTcp("localhost", 23432);
+    auto reqVibeConn = connectTcp(host, port);
     scope(exit) reqVibeConn.close();
     reqVibeConn.write(req);
 }
 
-bool waitForSignal(ref shared(bool) signal, int timeout = 10)
+bool waitForSignal(ref shared bool signal, int timeout = 10)
 {
     int count = 0;
     while(!signal && count < timeout) {
@@ -171,20 +170,42 @@ bool waitForSignal(ref shared(bool) signal, int timeout = 10)
 
 void runBrowsers(Browser[] availableBrowsers)
 {
+    void updateTimeoutCounter(string browserName)
+    {
+        timeout_counter++;
+        writeln(browserName ~ " timed out!");
+    }
+
+    timeout_counter = 0;
     foreach(browser; taskPool.parallel(availableBrowsers, 1)) {
         browser.open();
         switch(browser.name)
         {
             case "firefox":
-                waitForSignal(firefoxDone); break;
+                if (!waitForSignal(firefoxDone)) {
+                    updateTimeoutCounter("firefox");
+                }
+                break;
             case "chrome":
-                waitForSignal(chromeDone);  break;
+                if (!waitForSignal(chromeDone)) {
+                    updateTimeoutCounter("chrome");
+                }
+                break;
             case "safari":
-                waitForSignal(safariDone);  break;
+                if (!waitForSignal(safariDone)) {
+                    updateTimeoutCounter("safari");
+                }
+                break;
             case "opera":
-                waitForSignal(operaDone);   break;
+                if (!waitForSignal(operaDone)) {
+                    updateTimeoutCounter("opera");
+                }
+                break;
             case "ie":
-                waitForSignal(ieDone);      break;
+                if (!waitForSignal(ieDone)) {
+                    updateTimeoutCounter("ie");
+                }
+                break;
             default:
                 // do nothing
         }
@@ -197,6 +218,8 @@ struct Args
 {
     string testNumber = null;
     string moduleName = null;
+    string host = "localhost";
+    string port = "23432";
 }
 
 // returns -1 if something unexpected happened
@@ -209,15 +232,25 @@ int main(string[] argz)
     Args args = Args();
     getopt(argz,
         "testnumber|t", &args.testNumber,
-        "module|m",     &args.moduleName);
+        "module|m",     &args.moduleName,
+        "host|h",       &args.host,
+        "port|p",       &args.port
+    );
+
+    host = args.host;
+    port = to!ushort(args.port);
+
+    // set external call strings
+    string stop_vibe  = "GET /stopvibe HTTP/1.1\r\n"  "Host: " ~ args.host ~ ":" ~ args.port ~ "\r\n\r\n";
+    string run_report = "GET /runreport HTTP/1.1\r\n" "Host: " ~ args.host ~ ":" ~ args.port ~ "\r\n\r\n";
 
     // can make command line arg
     auto availableBrowsers = [
-        //Browser("ie"),    // windows only
-        Browser("firefox", args.testNumber, args.moduleName),
-        Browser("chrome",  args.testNumber, args.moduleName),
-        Browser("safari",  args.testNumber, args.moduleName),  // mac only
-        //Browser("opera",   args.testNumber, args.moduleName)
+        //Browser("ie",      args.testNumber, args.moduleName, args.host, args.port),  // windows only
+        Browser("firefox", args.testNumber, args.moduleName, args.host, args.port),
+        Browser("chrome",  args.testNumber, args.moduleName, args.host, args.port),
+        Browser("safari",  args.testNumber, args.moduleName, args.host, args.port),  // mac only
+        //Browser("opera",   args.testNumber, args.moduleName, args.host, args.port)
     ];
 
     // start server and run browsers
@@ -227,7 +260,7 @@ int main(string[] argz)
 
         // when browsers are done run the report **
         externalRequest(run_report);
-        auto reported = receiveTimeout(dur!"seconds"(10), (SignalReportDone _reportDone) {
+        auto reported = receiveTimeout(dur!"seconds"(20), (SignalReportDone _reportDone) {
             writeln(browserReports);
         });
     });
@@ -240,7 +273,7 @@ int main(string[] argz)
     );
 
     // parse results
-    if (match(browserReports, regex(r"\sresult:\sF\s|^timeout:", "gm"))) {
+    if (match(browserReports, regex(r"\sresult:\sF\s|^timeout:", "gm")) || timeout_counter > 0) {
         vibeStatus = 1;
     }
 

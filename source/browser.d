@@ -48,21 +48,21 @@ struct Browser
 {
     string name;
     string cmdName;
-    string host;
-    string port;
     string testNumber;
     string moduleName;
+    string host;
+    string port;
     string url;
 
     this(string name, string testNumber = null, string moduleName = null, string host = "localhost", string port = "23432")
     {
-        this.name       = name;
-        this.cmdName    = info[name];
-        this.testNumber = testNumber;
-        this.moduleName = moduleName;
-        this.host       = host;
-        this.port       = port;
-        this.url = buildURL();
+        this.name            = name;
+        this.cmdName         = info[name];
+        this.testNumber      = testNumber;
+        this.moduleName      = moduleName;
+        this.host            = host;
+        this.port            = port;
+        this.url             = buildURL();
     }
 
     string buildURL()
@@ -78,6 +78,7 @@ struct Browser
             url = baseUrl ~ "?module=" ~ moduleName;
         }
 
+        // set browser, host, and port
         if (testNumber || moduleName) {
             url ~= "&browser=";
         }
@@ -109,7 +110,7 @@ struct Browser
         writeln("opening " ~ name ~ " to " ~ url);
         version(OSX)
         {
-            writeln(shell(`osascript -e 'tell application "` ~ cmdName ~ `" to open location "` ~ url ~ `"'`));
+            shell(`osascript -e 'tell application "` ~ cmdName ~ `" to open location "` ~ url ~ `"'`);
         }
         else
         {
@@ -123,19 +124,19 @@ struct Browser
         writeln("closing " ~ name ~ "...");
         version(OSX)
         {
-            writeln(shell(`osascript -e 'tell application "` ~ cmdName ~ `" to quit'`));
+            shell(`osascript -e 'tell application "` ~ cmdName ~ `" to quit'`);
         }
         version(Windows)
         {
             string exeName = baseName(cmdName);
-            writeln( shell("taskkill /F /im " ~ exeName) );
+            shell("taskkill /F /im " ~ exeName);
         }
         version(linux)
         {
             string exeName = baseName(cmdName);
             // pkill "google-chrome" doesnt work but `pkill chrome` does
             if (exeName == "google-chrome") { exeName = "chrome"; }
-            writeln( shell("pkill " ~ exeName) );
+            shell("pkill " ~ exeName);
         }
     }
 }
