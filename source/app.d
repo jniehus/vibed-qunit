@@ -149,19 +149,14 @@ bool waitForSignal(Browser browser, int timeout = 10)
 
 void runBrowsers(Browser[] availableBrowsers)
 {
-    void updateTimeoutCounter(string browserName)
-    {
-        timeout_counter++;
-        writeln(browserName ~ " timed out!");
-    }
-
     signalQUnitDone = new SignalQUnitDone();
     timeout_counter = 0;
     foreach(browser; taskPool.parallel(availableBrowsers, 1)) {
         signalQUnitDone.connect(&browser.watchForQUnitDone);
         browser.open();
         if (!waitForSignal(browser)) {
-            updateTimeoutCounter(browser.name);
+            timeout_counter++;
+            writeln(browser.name ~ " timed out!");
         }
         signalQUnitDone.disconnect(&browser.watchForQUnitDone);
         browser.close();
