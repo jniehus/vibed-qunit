@@ -60,8 +60,10 @@ string recordResults(Json data)
 
 string qUnitDone(Json data)
 {
-    string name = to!string(data["browser"]);
-    signalQUnitDone.message(name ~ " done");
+    synchronized {
+        string name = to!string(data["browser"]);
+        signalQUnitDone.message(name ~ " done");
+    }
     return "done";
 }
 
