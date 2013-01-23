@@ -160,8 +160,8 @@ void runBrowsers(Browser[] availableBrowsers)
         browser.open();
         if (!waitForSignal(browser)) {
             updateTimeoutCounter(browser.name);
-            browser.close(); // make sure to close the browser
         }
+        browser.close();
     }
 }
 

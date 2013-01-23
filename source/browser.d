@@ -37,7 +37,7 @@ version(linux)
 void startBrowser(Tid tid, string location, string url)
 {
     try {
-        writeln( shell("\"" ~ location ~ "\" " ~ url) );
+        system("\"" ~ location ~ "\" " ~ url);
     }
     catch {
         send(tid, 1);
@@ -71,7 +71,6 @@ class Browser
     {
         if (msg == ("\""~ name ~ "\"" ~ " done")) {
             done = true;
-            close();
         }
     }
 
@@ -120,7 +119,7 @@ class Browser
         writeln("opening " ~ name ~ " to " ~ url);
         version(OSX)
         {
-            shell(`osascript -e 'tell application "` ~ cmdName ~ `" to open location "` ~ url ~ `"'`);
+            system(`osascript -e 'tell application "` ~ cmdName ~ `" to open location "` ~ url ~ `"'`);
         }
         else
         {
@@ -134,19 +133,19 @@ class Browser
         writeln("closing " ~ name ~ "...");
         version(OSX)
         {
-            shell(`osascript -e 'tell application "` ~ cmdName ~ `" to quit'`);
+            system(`osascript -e 'tell application "` ~ cmdName ~ `" to quit'`);
         }
         version(Windows)
         {
             string exeName = baseName(cmdName);
-            shell("taskkill /F /im " ~ exeName);
+            system("taskkill /F /im " ~ exeName);
         }
         version(linux)
         {
             string exeName = baseName(cmdName);
             // pkill "google-chrome" doesnt work but `pkill chrome` does
             if (exeName == "google-chrome") { exeName = "chrome"; }
-            shell("pkill " ~ exeName);
+            system("pkill " ~ exeName);
         }
     }
 }
