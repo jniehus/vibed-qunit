@@ -44,7 +44,7 @@ void startBrowser(Tid tid, string location, string url)
     }
 }
 
-struct Browser
+class Browser
 {
     string name;
     string cmdName;
@@ -53,6 +53,7 @@ struct Browser
     string host;
     string port;
     string url;
+    @property bool done = false;
 
     this(string name, string testNumber = null, string moduleName = null, string host = "localhost", string port = "23432")
     {
@@ -63,6 +64,15 @@ struct Browser
         this.host            = host;
         this.port            = port;
         this.url             = buildURL();
+    }
+
+    // slot
+    void watchForQUnitDone(string msg)
+    {
+        if (msg == ("\""~ name ~ "\"" ~ " done")) {
+            done = true;
+            close();
+        }
     }
 
     string buildURL()
