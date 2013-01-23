@@ -1,6 +1,6 @@
 /**
  *  browser.d
-**/
+ */
 
 module browser;
 
@@ -37,14 +37,14 @@ version(linux)
 void startBrowser(Tid tid, string location, string url)
 {
     try {
-        writeln( shell("\"" ~ location ~ "\" " ~ url) );
+        system("\"" ~ location ~ "\" " ~ url);
     }
     catch {
         send(tid, 1);
     }
 }
 
-struct Browser
+class Browser
 {
     string name;
     string cmdName;
@@ -53,6 +53,7 @@ struct Browser
     string host;
     string port;
     string url;
+    @property bool done = false;
 
     this(string name, string testNumber = null, string moduleName = null, string host = "localhost", string port = "23432")
     {
@@ -63,6 +64,14 @@ struct Browser
         this.host            = host;
         this.port            = port;
         this.url             = buildURL();
+    }
+
+    // slot
+    void watchForQUnitDone(string msg)
+    {
+        if (msg == ("\""~ name ~ "\"" ~ " done")) {
+            done = true;
+        }
     }
 
     string buildURL()
@@ -110,7 +119,7 @@ struct Browser
         writeln("opening " ~ name ~ " to " ~ url);
         version(OSX)
         {
-            shell(`osascript -e 'tell application "` ~ cmdName ~ `" to open location "` ~ url ~ `"'`);
+            system(`osascript -e 'tell application "` ~ cmdName ~ `" to open location "` ~ url ~ `"'`);
         }
         else
         {
@@ -124,19 +133,19 @@ struct Browser
         writeln("closing " ~ name ~ "...");
         version(OSX)
         {
-            shell(`osascript -e 'tell application "` ~ cmdName ~ `" to quit'`);
+            system(`osascript -e 'tell application "` ~ cmdName ~ `" to quit'`);
         }
         version(Windows)
         {
             string exeName = baseName(cmdName);
-            shell("taskkill /F /im " ~ exeName);
+            system("taskkill /F /im " ~ exeName);
         }
         version(linux)
         {
             string exeName = baseName(cmdName);
             // pkill "google-chrome" doesnt work but `pkill chrome` does
             if (exeName == "google-chrome") { exeName = "chrome"; }
-            shell("pkill " ~ exeName);
+            system("pkill " ~ exeName);
         }
     }
 }

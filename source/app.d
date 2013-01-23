@@ -15,21 +15,16 @@ import std.getopt, std.stdio, std.array, std.conv;
 import std.process, std.uri, std.regex, std.file;
 
 // local
-import browser, report, signals;
+import browser, report, vibeSignals;
 
 // module variables
-Json[][string]  qunitResults;
-shared string   browserReports;
-Tid             mainTid;
-shared string   host;
-shared ushort   port;
-int             timeout_counter;
-
-shared bool chromeDone  = false;
-shared bool firefoxDone = false;
-shared bool operaDone   = false;
-shared bool safariDone  = false;
-shared bool ieDone      = false;
+Json[][string]         qunitResults;
+shared string          browserReports;
+Tid                    mainTid;
+shared string          host;
+shared ushort          port;
+int                    timeout_counter;
+__gshared SignalQUnitDone signalQUnitDone;
 
 //--- VIBE SERVER THREAD ---
 void handleRequest(HttpServerRequest req, HttpServerResponse res)
@@ -66,22 +61,7 @@ string recordResults(Json data)
 string qUnitDone(Json data)
 {
     string name = to!string(data["browser"]);
-    switch(name)
-    {
-        case `"chrome"`:
-            chromeDone  = true; break;
-        case `"firefox"`:
-            firefoxDone = true; break;
-        case `"opera"`:
-            operaDone   = true; break;
-        case `"safari"`:
-            safariDone  = true; break;
-        case `"ie"`:
-            ieDone      = true; break;
-        default:
-            writeln(name ~ " not recognized!");
-    }
-    //send(mainTid, SignalQUnitDone(name));
+    signalQUnitDone.message(name ~ " done");
     return "done";
 }
 
@@ -146,7 +126,6 @@ void launchVibe(Tid tid)
     }
 }
 
-
 //--- MAIN THREAD ---
 void externalRequest(string req)
 {
@@ -155,10 +134,10 @@ void externalRequest(string req)
     reqVibeConn.write(req);
 }
 
-bool waitForSignal(ref shared bool signal, int timeout = 10)
+bool waitForSignal(Browser browser, int timeout = 10)
 {
     int count = 0;
-    while(!signal && count < timeout) {
+    while(!browser.done && count < timeout) {
         core.thread.Thread.sleep(dur!"seconds"(1));
         count++;
     }
@@ -179,37 +158,9 @@ void runBrowsers(Browser[] availableBrowsers)
     timeout_counter = 0;
     foreach(browser; taskPool.parallel(availableBrowsers, 1)) {
         browser.open();
-        switch(browser.name)
-        {
-            case "firefox":
-                if (!waitForSignal(firefoxDone)) {
-                    updateTimeoutCounter("firefox");
-                }
-                break;
-            case "chrome":
-                if (!waitForSignal(chromeDone)) {
-                    updateTimeoutCounter("chrome");
-                }
-                break;
-            case "safari":
-                if (!waitForSignal(safariDone)) {
-                    updateTimeoutCounter("safari");
-                }
-                break;
-            case "opera":
-                if (!waitForSignal(operaDone)) {
-                    updateTimeoutCounter("opera");
-                }
-                break;
-            case "ie":
-                if (!waitForSignal(ieDone)) {
-                    updateTimeoutCounter("ie");
-                }
-                break;
-            default:
-                // do nothing
+        if (!waitForSignal(browser)) {
+            updateTimeoutCounter(browser.name);
         }
-        //receiveTimeout(dur!"seconds"(20), (SignalQUnitDone _qunitDone){});
         browser.close();
     }
 }
@@ -244,14 +195,17 @@ int main(string[] argz)
     string stop_vibe  = "GET /stopvibe HTTP/1.1\r\n"  "Host: " ~ args.host ~ ":" ~ args.port ~ "\r\n\r\n";
     string run_report = "GET /runreport HTTP/1.1\r\n" "Host: " ~ args.host ~ ":" ~ args.port ~ "\r\n\r\n";
 
-    // can make command line arg
-    auto availableBrowsers = [
-        //Browser("ie",      args.testNumber, args.moduleName, args.host, args.port),  // windows only
-        Browser("firefox", args.testNumber, args.moduleName, args.host, args.port),
-        Browser("chrome",  args.testNumber, args.moduleName, args.host, args.port),
-        Browser("safari",  args.testNumber, args.moduleName, args.host, args.port),  // mac only
-        //Browser("opera",   args.testNumber, args.moduleName, args.host, args.port)
-    ];
+    Browser[] availableBrowsers;
+    //availableBrowsers ~= new Browser("ie",      args.testNumber, args.moduleName, args.host, args.port),  // windows only
+    availableBrowsers ~= new Browser("firefox", args.testNumber, args.moduleName, args.host, args.port),
+    availableBrowsers ~= new Browser("chrome",  args.testNumber, args.moduleName, args.host, args.port),
+    availableBrowsers ~= new Browser("safari",  args.testNumber, args.moduleName, args.host, args.port);  // mac only
+    //availableBrowsers ~= new Browser("opera",   args.testNumber, args.moduleName, args.host, args.port)
+
+    signalQUnitDone = new SignalQUnitDone();
+    foreach(browser; availableBrowsers) {
+        signalQUnitDone.connect(&browser.watchForQUnitDone);
+    }
 
     // start server and run browsers
     auto vibeTid = spawn( &launchVibe, thisTid );
