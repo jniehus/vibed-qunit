@@ -15,7 +15,7 @@ import std.getopt, std.stdio, std.array, std.conv;
 import std.process, std.uri, std.regex, std.file;
 
 // local
-import browser, report, signals;
+import browser, report, vibeSignals;
 
 // module variables
 Json[][string]         qunitResults;
@@ -195,7 +195,6 @@ int main(string[] argz)
     string stop_vibe  = "GET /stopvibe HTTP/1.1\r\n"  "Host: " ~ args.host ~ ":" ~ args.port ~ "\r\n\r\n";
     string run_report = "GET /runreport HTTP/1.1\r\n" "Host: " ~ args.host ~ ":" ~ args.port ~ "\r\n\r\n";
 
-    // can make command line arg
     Browser[] availableBrowsers;
     //availableBrowsers ~= new Browser("ie",      args.testNumber, args.moduleName, args.host, args.port),  // windows only
     availableBrowsers ~= new Browser("firefox", args.testNumber, args.moduleName, args.host, args.port),

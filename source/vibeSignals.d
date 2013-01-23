@@ -1,8 +1,8 @@
 /**
  *  signals.d
-**/
+ */
 
-module signals;
+module vibeSignals;
 import std.signals;
 
 struct SignalVibeReady  { bool isReady = false; }
