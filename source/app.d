@@ -155,12 +155,15 @@ void runBrowsers(Browser[] availableBrowsers)
         writeln(browserName ~ " timed out!");
     }
 
+    signalQUnitDone = new SignalQUnitDone();
     timeout_counter = 0;
     foreach(browser; taskPool.parallel(availableBrowsers, 1)) {
+        signalQUnitDone.connect(&browser.watchForQUnitDone);
         browser.open();
         if (!waitForSignal(browser)) {
             updateTimeoutCounter(browser.name);
         }
+        signalQUnitDone.disconnect(&browser.watchForQUnitDone);
         browser.close();
     }
 }
@@ -201,11 +204,6 @@ int main(string[] argz)
     availableBrowsers ~= new Browser("chrome",  args.testNumber, args.moduleName, args.host, args.port),
     availableBrowsers ~= new Browser("safari",  args.testNumber, args.moduleName, args.host, args.port);  // mac only
     //availableBrowsers ~= new Browser("opera",   args.testNumber, args.moduleName, args.host, args.port)
-
-    signalQUnitDone = new SignalQUnitDone();
-    foreach(browser; availableBrowsers) {
-        signalQUnitDone.connect(&browser.watchForQUnitDone);
-    }
 
     // start server and run browsers
     auto vibeTid = spawn( &launchVibe, thisTid );
