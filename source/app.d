@@ -17,14 +17,15 @@ import std.process, std.uri, std.regex, std.file;
 // local
 import browser, report, vibeSignals;
 
-// module variables
-Json[][string]         qunitResults;
-shared string          browserReports;
-Tid                    mainTid;
-shared string          host;
-shared ushort          port;
-int                    timeout_counter;
+// global variables shared between vibe and main
+__gshared string          browserReports;
+__gshared Tid             mainTid;
+__gshared string          host;
+__gshared ushort          port;
 __gshared SignalQUnitDone signalQUnitDone;
+
+// vibe module variables
+Json[][string]  qunitResults;
 
 //--- VIBE SERVER THREAD ---
 void handleRequest(HttpServerRequest req, HttpServerResponse res)
@@ -149,7 +150,7 @@ bool waitForSignal(Browser browser, int timeout = 10)
     return true;
 }
 
-void runBrowsers(Browser[] availableBrowsers)
+void runBrowsers(Browser[] availableBrowsers, ref int timeout_counter)
 {
     signalQUnitDone = new SignalQUnitDone();
     timeout_counter = 0;
@@ -203,9 +204,10 @@ int main(string[] argz)
     //availableBrowsers ~= new Browser("opera",   args.testNumber, args.moduleName, args.host, args.port)
 
     // start server and run browsers
+    int timeout_counter;
     auto vibeTid = spawn( &launchVibe, thisTid );
     receiveTimeout(dur!"seconds"(20), (SignalVibeReady _vibeReady) {
-        runBrowsers(availableBrowsers);
+        runBrowsers(availableBrowsers, timeout_counter);
 
         // when browsers are done run the report **
         externalRequest(run_report);
