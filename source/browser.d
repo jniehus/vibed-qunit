@@ -53,17 +53,17 @@ class Browser
     string host;
     string port;
     string url;
-    @property bool done = false;
+    bool   done = false;
 
     this(string name, string testNumber = null, string moduleName = null, string host = "localhost", string port = "23432")
     {
-        this.name            = name;
-        this.cmdName         = info[name];
-        this.testNumber      = testNumber;
-        this.moduleName      = moduleName;
-        this.host            = host;
-        this.port            = port;
-        this.url             = buildURL();
+        this.name       = name;
+        this.cmdName    = info[name];
+        this.testNumber = testNumber;
+        this.moduleName = moduleName;
+        this.host       = host;
+        this.port       = port;
+        this.url        = buildURL();
     }
 
     // slot
