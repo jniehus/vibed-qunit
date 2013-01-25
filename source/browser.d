@@ -1,5 +1,5 @@
 /**
- *  browser.d
+ * browser.d
  */
 
 module browser;

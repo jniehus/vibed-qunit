@@ -1,5 +1,5 @@
 /**
- *  signals.d
+ * signals.d
  */
 
 module vibeSignals;
