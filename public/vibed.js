@@ -1,3 +1,5 @@
+// set up globals params object that all tests can access
+
 var parameters = null;
 
 $.extend({
@@ -21,7 +23,7 @@ $.extend({
 $(document).ready(function() {
     /** VIBE SETUP **/
     parameters = $.getUrlVars();
-    var vibe   = 'http://' + parameters["host"] + ':' + parameters["port"]
+    var vibe   = 'http://' + window.document.location.hostname + ':' + window.document.location.port;
 
     // generic method to post requests to vibe
     function postRequest (req) {

@@ -87,14 +87,14 @@ class Browser
             url = baseUrl ~ "?module=" ~ moduleName;
         }
 
-        // set browser, host, and port
+        // set browser
         if (testNumber || moduleName) {
             url ~= "&browser=";
         }
         else {
             url ~= "?browser=";
         }
-        url ~= name ~ "&host=" ~ host ~ "&port=" ~ port;
+        url ~= name;
 
         url = std.uri.encode(url);
         return url;
