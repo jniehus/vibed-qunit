@@ -53,7 +53,7 @@ class Browser
     string host;
     string port;
     string url;
-    @property bool done = false;
+    bool   done = false;
 
     this(string name, string testNumber = null, string moduleName = null, string host = "localhost", string port = "23432")
     {
