@@ -103,7 +103,6 @@ void runReport(HttpServerRequest req = null, HttpServerResponse res = null)
 static this()
 {
     auto settings = new HttpServerSettings;
-    settings.onStart = () => send(mainTid, SignalVibeReady(true));
     settings.port = port;
 
     auto router = new UrlRouter;
@@ -116,6 +115,7 @@ static this()
     listenHttp(settings, router);
 }
 
+//--- MAIN THREAD ---
 void launchVibe(Tid tid)
 {
     mainTid = tid;
@@ -129,7 +129,6 @@ void launchVibe(Tid tid)
     }
 }
 
-//--- MAIN THREAD ---
 void externalRequest(string req)
 {
     auto reqVibeConn = connectTcp(host, port);
@@ -137,17 +136,34 @@ void externalRequest(string req)
     reqVibeConn.write(req);
 }
 
-bool waitForSignal(Browser browser, int timeout = 10)
+void listenForVibe()
+{
+    int   count = 0;
+    bool  ready = false;
+    while(!ready && count < 10) {
+        try {
+            writeln("Attempting to connect to vibe " ~ host ~ ":", port);
+            auto sock = connectTcp(host, port);
+            scope(exit) sock.close();
+            ready = true;
+            send(mainTid, SignalVibeReady(true));
+        }
+        catch(Exception e) {
+            writeln("not open for business yet...");
+            sleep(dur!"seconds"(1));
+            count++;
+        }
+    }
+}
+
+bool waitFor(ref bool condition, int timeout = 10)
 {
     int count = 0;
-    while(!browser.done && count < timeout) {
-        core.thread.Thread.sleep(dur!"seconds"(1));
+    while(!condition && count < timeout) {
+        sleep(dur!"seconds"(1));
         count++;
     }
-    if (count == timeout) {
-        return false;
-    }
-    return true;
+    return !(count == timeout);
 }
 
 void runBrowsers(Browser[] availableBrowsers, ref int timeout_counter)
@@ -157,7 +173,7 @@ void runBrowsers(Browser[] availableBrowsers, ref int timeout_counter)
     foreach(browser; taskPool.parallel(availableBrowsers, 1)) {
         signalQUnitDone.connect(&browser.watchForQUnitDone);
         browser.open();
-        if (!waitForSignal(browser)) {
+        if (!waitFor(browser.done)) {
             timeout_counter++;
             writeln(browser.name ~ " timed out!");
         }
@@ -170,7 +186,7 @@ struct Args
 {
     string testNumber = null;
     string moduleName = null;
-    string host = "localhost";
+    string host = "127.0.0.1";
     string port = "23432";
 }
 
@@ -206,6 +222,7 @@ int main(string[] argz)
     // start server and run browsers
     int timeout_counter;
     auto vibeTid = spawn( &launchVibe, thisTid );
+    listenForVibe();
     receiveTimeout(dur!"seconds"(20), (SignalVibeReady _vibeReady) {
         runBrowsers(availableBrowsers, timeout_counter);
 
