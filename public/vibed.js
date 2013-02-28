@@ -56,12 +56,6 @@ $(document).ready(function() {
         return assertions;
     }
 
-    function suiteBegin() {
-        postRequest({ 'action': "qunitbegin" }).done(function() {
-            /* do nothing for now */
-        });
-    }
-
     // ajax request to vibe to log results of a specific QUnit test case
     function testResults(details) {
         details['action'] = "testresults"
@@ -84,9 +78,6 @@ $(document).ready(function() {
             });
         }, 500);
     }
-
-    // call this method to record that browsers actually started
-    QUnit.begin( suiteBegin );
 
     // call this function after each test is done
     QUnit.testDone( testResults );

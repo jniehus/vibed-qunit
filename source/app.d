@@ -80,8 +80,6 @@ void processReq(HttpServerRequest req, HttpServerResponse res)
             resBody = recordResults(req.json); break;
         case `"suiteresults"`:
             resBody = recordResults(req.json); break;
-        case `"qunitbegin"`:
-            resBody = recordResults(req.json); break;
         case `"qunitdone"`:
             resBody = qUnitDone(req.json); break;
         case `"stopvibe"`:
@@ -213,11 +211,11 @@ int main(string[] argz)
     string run_report = "GET /runreport HTTP/1.1\r\n" "Host: " ~ args.host ~ ":" ~ args.port ~ "\r\n\r\n";
 
     Browser[] availableBrowsers;
-    //availableBrowsers ~= new Browser("ie",      args.testNumber, args.moduleName, args.host, args.port),  // windows only
-    availableBrowsers ~= new Browser("firefox", args.testNumber, args.moduleName, args.host, args.port),
-    availableBrowsers ~= new Browser("chrome",  args.testNumber, args.moduleName, args.host, args.port),
+    //availableBrowsers ~= new Browser("ie",      args.testNumber, args.moduleName, args.host, args.port);  // windows only
+    availableBrowsers ~= new Browser("firefox", args.testNumber, args.moduleName, args.host, args.port);
+    availableBrowsers ~= new Browser("chrome",  args.testNumber, args.moduleName, args.host, args.port);
     availableBrowsers ~= new Browser("safari",  args.testNumber, args.moduleName, args.host, args.port);  // mac only
-    //availableBrowsers ~= new Browser("opera",   args.testNumber, args.moduleName, args.host, args.port)
+    availableBrowsers ~= new Browser("opera",   args.testNumber, args.moduleName, args.host, args.port);
 
     // start server and run browsers
     int timeout_counter;
