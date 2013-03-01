@@ -33,7 +33,7 @@ string parseAsserts(Json[] asserts)
     return std.array.join(assertStrings);
 }
 
-string parseTests(Json[] tests, ref Json summary)
+string[] parseTests(Json[] tests, ref Json summary)
 {
     string[] testStrings;
     foreach(result; taskPool.parallel(tests, 1)) {
@@ -45,27 +45,31 @@ string parseTests(Json[] tests, ref Json summary)
                 test_string ~= "  assertions:\n";
                 Json[] assertions = cast(Json[]) result["assertions"];
                 test_string ~= parseAsserts(assertions);
-            }
-            synchronized {
-                testStrings ~= test_string;
+                synchronized {
+                    testStrings ~= test_string;
+                }
             }
         }
         else if (result["action"].toString() == `"suiteresults"`) {
             summary = result;
         }
     }
-    return std.array.join(testStrings);
+    return testStrings;
 }
 
 string prettyReport(Json[] browserResults)
 {
     Json summary = null;
     string pretty_summary = null;
-    string pretty_header = "\n--- !QUnit_Command_Line_Example_Tests\n";
+    string pretty_header  = "\n--- !QUnit_Command_Line_Example_Tests\n";
     string pretty_browser = "browser: " ~ browserResults[0]["browser"].toString() ~ "\n";
-    string pretty_tests = "tests:\n";
-    pretty_tests ~= parseTests(browserResults, summary);
-    string pretty = pretty_header ~ pretty_browser ~ pretty_tests;
+    string pretty  = pretty_header ~ pretty_browser;
+    string[] tests = parseTests(browserResults, summary);
+    if (tests.length != 0 ) {
+        string pretty_tests = "failed_tests:\n";
+        pretty_tests ~= std.array.join(tests);
+        pretty ~= pretty_tests;
+    }
     if (summary != null) {
         pretty_summary = "summary:\n";
         pretty_summary ~= "  failed: "  ~ summary["failed"].toString()  ~ "\n";
