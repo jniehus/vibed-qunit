@@ -5,5 +5,5 @@ bringing [qunit](http://qunitjs.com/ "qunit") to the command line with [vibe.d](
 
 requirements 
 * jQuery 1.8+
-* my hacked version of Vibed
+* vibed 7.13+
 * The D Programing Language v2.060+
