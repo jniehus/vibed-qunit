@@ -61,7 +61,7 @@ string prettyReport(Json[] browserResults)
 {
     Json summary = null;
     string pretty_summary = null;
-    string pretty_header  = "\n--- !QUnit_Command_Line_Example_Tests\n";
+    string pretty_header  = "\n--- !QUnit_Results\n";
     string pretty_browser = "browser: " ~ browserResults[0]["browser"].toString() ~ "\n";
     string pretty  = pretty_header ~ pretty_browser;
     string[] tests = parseTests(browserResults, summary);
