@@ -5,8 +5,11 @@
 module browser;
 
 // phobos
+import core.thread;
 import std.concurrency, std.regex;
 import std.stdio, std.process, std.uri, std.path, std.file;
+
+import core.sys.posix.signal: SIGKILL;
 
 version(OSX)
 {
@@ -34,16 +37,6 @@ version(linux)
     ];
 }
 
-void startBrowser(Tid tid, string location, string url)
-{
-    try {
-        system("\"" ~ location ~ "\" " ~ url);
-    }
-    catch {
-        send(tid, 1);
-    }
-}
-
 class Browser
 {
     string name;
@@ -54,8 +47,9 @@ class Browser
     string port;
     string url;
     bool   done = false;
+    Pid    browser_exe;
 
-    this(string name, string testNumber = null, string moduleName = null, string host = "localhost", string port = "23432")
+    this(string name, string testNumber = null, string moduleName = null, string host = "localhost", string port = "34000")
     {
         this.name       = name;
         this.cmdName    = info[name];
@@ -119,12 +113,12 @@ class Browser
         writeln("opening " ~ name ~ " to " ~ url);
         version(OSX)
         {
-            system(`osascript -e 'tell application "` ~ cmdName ~ `" to open location "` ~ url ~ `"'`);
+            executeShell(`osascript -e 'tell application "` ~ cmdName ~ `" to open location "` ~ url ~ `"'`);
         }
         else
         {
             escapeCmdLineChars(url);
-            spawn( &startBrowser, thisTid, cmdName, url );
+            browser_exe = spawnProcess( [cmdName, url] );
         }
     }
 
@@ -133,19 +127,17 @@ class Browser
         writeln("closing " ~ name ~ "...");
         version(OSX)
         {
-            system(`osascript -e 'tell application "` ~ cmdName ~ `" to quit'`);
+            executeShell(`osascript -e 'tell application "` ~ cmdName ~ `" to quit'`);
         }
         version(Windows)
         {
-            string exeName = baseName(cmdName);
-            system("taskkill /F /im " ~ exeName);
+            kill( browser_exe, 10 );
+            wait( browser_exe );
         }
         version(linux)
         {
-            string exeName = baseName(cmdName);
-            // pkill "google-chrome" doesnt work but `pkill chrome` does
-            if (exeName == "google-chrome") { exeName = "chrome"; }
-            system("pkill " ~ exeName);
+            kill( browser_exe, SIGKILL );
+            wait( browser_exe );
         }
     }
 }
