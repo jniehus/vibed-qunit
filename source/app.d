@@ -5,7 +5,7 @@
 module app;
 
 // vibe
-import vibe.vibe;
+import vibe.d;
 
 // phobos
 import core.thread;
@@ -17,9 +17,16 @@ import std.process, std.uri, std.regex, std.file;
 // local
 import browser, report, vibeSignals;
 
+alias STid             = std.concurrency.Tid;
+alias s_receive        = std.concurrency.receive;
+alias s_receiveTimeout = std.concurrency.receiveTimeout;
+
+alias VTid             = vibe.core.concurrency.Tid;
+alias v_receive        = vibe.core.concurrency.receive;
+alias v_receiveTimeout = vibe.core.concurrency.receiveTimeout;
+
 // global variables shared between vibe and main
-__gshared string          browserReports;
-__gshared Tid             mainTid;
+__gshared STid            mainTid;
 __gshared string          host;
 __gshared ushort          port;
 __gshared SignalQUnitDone signalQUnitDone;
@@ -28,12 +35,14 @@ __gshared SignalQUnitDone signalQUnitDone;
 Json[][string]  qunitResults;
 
 //--- VIBE SERVER THREAD ---
-void handleRequest(HttpServerRequest req, HttpServerResponse res)
+void handleRequest( HTTPServerRequest  req,
+                    HTTPServerResponse res )
 {
 	res.redirect("/index.html");
 }
 
-void stopVibe(HttpServerRequest req = null, HttpServerResponse res = null)
+void stopVibe( HTTPServerRequest  req = null,
+               HTTPServerResponse res = null )
 {
     exitEventLoop();
 }
@@ -69,7 +78,8 @@ string qUnitDone(Json data)
 }
 
 // delegate tasks
-void processReq(HttpServerRequest req, HttpServerResponse res)
+void processReq( HTTPServerRequest  req,
+                 HTTPServerResponse res )
 {
     string resBody;
     switch(req.json["action"].toString())
@@ -88,69 +98,81 @@ void processReq(HttpServerRequest req, HttpServerResponse res)
             resBody = "fail";
     }
 
-    res.headers["Access-Control-Allow-Origin"] = "*";
     res.writeBody(resBody);
 }
 
-void runReport(HttpServerRequest req = null, HttpServerResponse res = null)
+void runReport( HTTPServerRequest  req = null,
+                HTTPServerResponse res = null )
 {
-    browserReports = generatePrettyReport(qunitResults);
-    send(mainTid, SignalReportDone(true));
+    string browserReports = generatePrettyReport(qunitResults);
+    send(mainTid, SignalReportDone(true, browserReports));
 }
 
-static this()
+shared static this()
 {
-    auto settings = new HttpServerSettings;
-    settings.port = port;
+    auto settings = new HTTPServerSettings;
+    settings.port = 8080;
 
-    auto router = new UrlRouter;
+    auto router = new URLRouter;
     router.get("/", &handleRequest);
     router.get("*", serveStaticFiles("./public/"));
     router.post("/process_req", &processReq);
     router.get( "/runreport",   &runReport);
     router.get( "/stopvibe",    &stopVibe);
 
-    listenHttp(settings, router);
+    writefln("VIBE> PORT: %s", port);
+    writeln("VIBE> begin listen");
+    listenHTTP(settings, router);
 }
 
 //--- MAIN THREAD ---
-void launchVibe(Tid tid)
+void launchVibe(STid tid)
 {
     mainTid = tid;
     logInfo("Running event loop...");
     try {
-        startListening(); // soon to be replaced or automatic
-        send(tid, SignalVibeStatus(runEventLoop()));
+        send(tid, SignalVibeStatus( runEventLoop() ));
     } catch( Throwable th ){
         logError("Unhandled exception in event loop: %s", th.toString());
-        send(tid, SignalVibeStatus(2));
+        send(tid, SignalVibeStatus(200));
     }
 }
 
-void externalRequest(string req)
+void externalRequest(string req, STid tid)
 {
-    auto reqVibeConn = connectTcp(host, port);
-    scope(exit) reqVibeConn.close();
-    reqVibeConn.write(req);
+    try {
+        auto reqVibeConn = connectTCP(host, port);
+        scope(exit) reqVibeConn.close();
+        reqVibeConn.write(req);
+    }
+    catch {
+        writeln("REQ> %s", req);
+        send(tid, SignalVibeStatus(300));
+    }
 }
 
-void listenForVibe()
+void listenForVibe(STid tid)
 {
     int   count = 0;
     bool  ready = false;
-    while(!ready && count < 10) {
+    while(!ready && count < 3) {
         try {
-            writeln("Attempting to connect to vibe " ~ host ~ ":", port);
-            auto sock = connectTcp(host, port);
+            logInfo("READY?> Attempting to connect to vibe @ %s:%s", host, port);
+            auto sock = connectTCP(host, port);
             scope(exit) sock.close();
+            writeln("READY?> Connection successful");
             ready = true;
-            send(mainTid, SignalVibeReady(true));
+            send(tid, SignalVibeReady(ready));
         }
         catch(Exception e) {
-            writeln("not open for business yet...");
+            writeln("READY?> Couldn't connect");
             sleep(dur!"seconds"(1));
             count++;
         }
+    }
+
+    if (!ready) {
+        send(tid, SignalVibeReady(ready));
     }
 }
 
@@ -185,7 +207,7 @@ struct Args
     string testNumber = null;
     string moduleName = null;
     string host = "127.0.0.1";
-    string port = "23432";
+    string port = "8080";
 }
 
 // returns -1 if something unexpected happened
@@ -213,36 +235,44 @@ int main(string[] argz)
     Browser[] availableBrowsers;
     //availableBrowsers ~= new Browser("ie",      args.testNumber, args.moduleName, args.host, args.port);  // windows only
     availableBrowsers ~= new Browser("firefox", args.testNumber, args.moduleName, args.host, args.port);
-    availableBrowsers ~= new Browser("chrome",  args.testNumber, args.moduleName, args.host, args.port);
-    availableBrowsers ~= new Browser("safari",  args.testNumber, args.moduleName, args.host, args.port);  // mac only
-    availableBrowsers ~= new Browser("opera",   args.testNumber, args.moduleName, args.host, args.port);
+    //availableBrowsers ~= new Browser("chrome",  args.testNumber, args.moduleName, args.host, args.port);
+    //availableBrowsers ~= new Browser("safari",  args.testNumber, args.moduleName, args.host, args.port);  // mac only
+    //availableBrowsers ~= new Browser("opera",   args.testNumber, args.moduleName, args.host, args.port);
 
     // start server and run browsers
+    string report;
     int timeout_counter;
     auto vibeTid = spawn( &launchVibe, thisTid );
-    listenForVibe();
-    receiveTimeout(dur!"seconds"(20), (SignalVibeReady _vibeReady) {
-        runBrowsers(availableBrowsers, timeout_counter);
+    listenForVibe(thisTid);
+    s_receiveTimeout(dur!"seconds"(20), (SignalVibeReady _vibeReady) {
+        if (_vibeReady.isReady) {
+            runBrowsers(availableBrowsers, timeout_counter);
 
-        // when browsers are done run the report **
-        externalRequest(run_report);
-        auto reported = receiveTimeout(dur!"seconds"(20), (SignalReportDone _reportDone) {
-            writeln(browserReports);
-        });
+            // when browsers are done run the report **
+            externalRequest(run_report, thisTid);
+            auto reported = s_receiveTimeout(dur!"seconds"(20), (SignalReportDone _reportDone) {
+                report = _reportDone.report;
+                writeln(_reportDone.report);
+            });
+        }
+        else {
+            writeln("READY?> couldn't reach vibe");
+        }
     });
 
     // stop the server
-    externalRequest(stop_vibe);
-    int vibeStatus = -1;
-    receive(
+    externalRequest(stop_vibe, thisTid);
+    int vibeStatus = 100;
+    s_receive(
         (SignalVibeStatus _vStatus) { vibeStatus = _vStatus.status; }
     );
 
+
     // parse results
-    if (match(browserReports, regex(r"\sresult:\sF\s|^timeout:", "gm")) || timeout_counter > 0) {
+    if (match(report, regex(r"\sresult:\sF\s|^timeout:", "gm")) || timeout_counter > 0) {
         vibeStatus = 1;
     }
 
-    writeln(vibeStatus);
+    writeln("FIN> VibeStatus: %s", vibeStatus);
     return vibeStatus;
 }

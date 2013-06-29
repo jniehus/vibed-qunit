@@ -23,14 +23,13 @@ $.extend({
 $(document).ready(function() {
     /** VIBE SETUP **/
     parameters = $.getUrlVars();
-    var vibe   = 'http://' + window.document.location.hostname + ':' + window.document.location.port;
 
     // generic method to post requests to vibe
     function postRequest (req) {
         req["browser"] = parameters["browser"];
         return $.ajax({
             type: 'POST',
-            url: vibe + '/process_req',
+            url: '/process_req',
             data: JSON.stringify(req),
             contentType: 'application/json',
             dataType: 'text'

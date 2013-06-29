@@ -1,7 +1,10 @@
 ﻿{
-    "name": "QUnit Command Line Example",
-	"description": "Simple HTTP server that serves QUnit",
+    "name": "QUnit Command Line",
+	"description": "Simple server to host QUnit",
     "authors": [ "Joshua Niehus" ],
     "version": "0.0.1",
-    "dependencies": {}
+    "versions": ["VibeCustomMain"],
+    "dependencies": {
+        "vibe-d": "0.7.16"
+    }
 }

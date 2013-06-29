@@ -5,9 +5,21 @@
 module vibeSignals;
 import std.signals;
 
-struct SignalVibeReady  { bool isReady = false; }
-struct SignalReportDone { bool isDone  = false; }
-struct SignalVibeStatus { int status; }
+struct SignalVibeReady
+{
+    bool isReady = false;
+}
+
+struct SignalReportDone
+{
+    bool   isDone = false;
+    string report = "";
+}
+
+struct SignalVibeStatus
+{
+    int status;
+}
 
 class SignalQUnitDone
 {
