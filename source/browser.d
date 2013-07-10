@@ -63,7 +63,7 @@ class Browser
     // slot
     void watchForQUnitDone(string msg)
     {
-        if (msg == ("\""~ name ~ "\"" ~ " done")) {
+        if (msg == ("\"" ~ name ~ "\"" ~ " done")) {
             done = true;
         }
     }

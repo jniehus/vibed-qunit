@@ -60,10 +60,10 @@ $(document).ready(function() {
         details['action'] = "testresults"
         if (details['failed'] > 0) {
             details['assertions'] = parseQunitTestAssertions(details)
+            postRequest(details).done(function() {
+                /* do nothing for now */
+            });
         }
-        postRequest(details).done(function() {
-            /* do nothing for now */
-        });
     }
 
     // ajax request to vibe to log results of QUnit suite

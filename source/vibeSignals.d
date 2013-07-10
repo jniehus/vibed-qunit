@@ -7,13 +7,13 @@ import std.signals;
 
 struct SignalVibeReady
 {
-    bool isReady = false;
+    bool isReady;
 }
 
 struct SignalReportDone
 {
-    bool   isDone = false;
-    string report = "";
+    bool   isDone;
+    string report;
 }
 
 struct SignalVibeStatus

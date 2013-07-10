@@ -1,10 +1,14 @@
-﻿{
+{
     "name": "QUnit Command Line",
-	"description": "Simple server to host QUnit",
-    "authors": [ "Joshua Niehus" ],
-    "version": "0.0.1",
+    "description": "bringing qunit to the command line",
+    "homepage": "http://www.the-dancing-dwarf.com",
+    "copyright": "Copyright © 2013, Joshua Niehus",
+    "authors": [
+        "Joshua Niehus"
+    ],
     "versions": ["VibeCustomMain"],
     "dependencies": {
         "vibe-d": "0.7.16"
-    }
+    },
+    "available_browsers": [ "safari", "firefox", "chrome", "opera" ]
 }
